@@ -1,0 +1,29 @@
+{
+  "name": "MinistryClass",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Class name"
+    },
+    "age_range": {
+      "type": "string",
+      "description": "Age range (e.g., 3-5)"
+    },
+    "teacher_id": {
+      "type": "string",
+      "description": "Assigned teacher ID"
+    },
+    "capacity": {
+      "type": "number",
+      "description": "Maximum capacity"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Additional notes"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

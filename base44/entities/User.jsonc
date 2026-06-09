@@ -1,0 +1,17 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "admin",
+        "teacher",
+        "volunteer",
+        "board_member"
+      ],
+      "default": "volunteer",
+      "description": "User role in the ministry"
+    }
+  }
+}

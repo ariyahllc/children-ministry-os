@@ -1,0 +1,51 @@
+{
+  "name": "Curriculum",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Lesson title"
+    },
+    "semester": {
+      "type": "string",
+      "enum": [
+        "Spring",
+        "Summer",
+        "Fall",
+        "Winter"
+      ],
+      "description": "Semester"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Bible Study",
+        "Worship",
+        "Crafts",
+        "Games",
+        "Memory Verse",
+        "Other"
+      ],
+      "description": "Category"
+    },
+    "lesson_number": {
+      "type": "number",
+      "description": "Lesson number"
+    },
+    "scripture": {
+      "type": "string",
+      "description": "Scripture reference"
+    },
+    "teacher_notes": {
+      "type": "string",
+      "description": "Teacher notes"
+    },
+    "attachment_url": {
+      "type": "string",
+      "description": "Attachment file URL"
+    }
+  },
+  "required": [
+    "title"
+  ]
+}

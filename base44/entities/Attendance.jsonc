@@ -1,0 +1,36 @@
+{
+  "name": "Attendance",
+  "type": "object",
+  "properties": {
+    "child_id": {
+      "type": "string",
+      "description": "Child ID"
+    },
+    "child_name": {
+      "type": "string",
+      "description": "Child full name"
+    },
+    "class_id": {
+      "type": "string",
+      "description": "Class ID"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Attendance date"
+    },
+    "present": {
+      "type": "boolean",
+      "default": false,
+      "description": "Present or absent"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notes"
+    }
+  },
+  "required": [
+    "child_id",
+    "date"
+  ]
+}
