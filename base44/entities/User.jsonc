@@ -6,12 +6,34 @@
       "type": "string",
       "enum": [
         "admin",
+        "co_leader",
         "teacher",
-        "volunteer",
-        "board_member"
+        "co_teacher",
+        "event_volunteer",
+        "board_rep",
+        "parent"
       ],
-      "default": "volunteer",
-      "description": "User role in the ministry"
+      "default": "event_volunteer",
+      "description": "User role"
+    },
+    "assigned_class_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Assigned class IDs (for teachers/co-teachers)"
+    },
+    "assigned_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Assigned event IDs (for volunteers)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Active status"
     }
   }
 }

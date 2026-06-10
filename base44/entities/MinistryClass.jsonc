@@ -10,17 +10,40 @@
       "type": "string",
       "description": "Age range (e.g., 3-5)"
     },
-    "teacher_id": {
+    "primary_teacher_id": {
       "type": "string",
-      "description": "Assigned teacher ID"
+      "description": "Primary teacher ID"
+    },
+    "co_teacher_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Co-teacher IDs"
     },
     "capacity": {
       "type": "number",
       "description": "Maximum capacity"
     },
+    "curriculum_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Assigned curriculum IDs"
+    },
+    "room": {
+      "type": "string",
+      "description": "Room or location"
+    },
     "notes": {
       "type": "string",
       "description": "Additional notes"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Active status"
     }
   },
   "required": [

@@ -6,52 +6,50 @@ import {
   BookOpen, Calendar, ClipboardList, FileText, MessageSquare,
   CheckSquare, BarChart3, ChevronLeft, ChevronRight, LogOut,
   Church, Menu, X, Sparkles, Globe, UserPlus, CalendarClock,
-  Mail, MessageCircle
+  Mail, MessageCircle, Shield, Bot, Workflow
 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { useCurrentUser } from '@/lib/useCurrentUser';
+import { useRole } from '@/lib/RoleContext';
+import { ROLE_LABELS } from '@/lib/rbac';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const navItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/', permission: 'view_dashboard' },
   { label: 'Children', icon: Users, path: '/children', permission: 'view_children' },
-  { label: 'Parents', icon: Heart, path: '/parents', permission: 'view_children' },
-  { label: 'Teachers', icon: GraduationCap, path: '/teachers', permission: 'view_children' },
-  { label: 'Volunteers', icon: UserCheck, path: '/volunteers', permission: 'view_events' },
+  { label: 'Parents', icon: Heart, path: '/parents', permission: 'view_parents' },
+  { label: 'Teachers', icon: GraduationCap, path: '/teachers', permission: 'view_teachers' },
+  { label: 'Volunteers', icon: UserCheck, path: '/volunteers', permission: 'view_volunteers' },
   { label: 'Classes', icon: BookOpen, path: '/classes', permission: 'view_classes' },
   { label: 'Attendance', icon: ClipboardList, path: '/attendance', permission: 'view_attendance' },
   { label: 'Events', icon: Calendar, path: '/events', permission: 'view_events' },
   { label: 'Curriculum', icon: GraduationCap, path: '/curriculum', permission: 'view_curriculum' },
   { label: 'Documents', icon: FileText, path: '/documents', permission: 'view_documents' },
-  { label: 'Communications', icon: MessageSquare, path: '/communications', permission: 'view_children' },
+  { label: 'Communications', icon: MessageSquare, path: '/communications', permission: 'view_communications' },
   { label: 'Tasks', icon: CheckSquare, path: '/tasks', permission: 'view_tasks' },
   { label: 'Reports', icon: BarChart3, path: '/reports', permission: 'view_reports' },
+  { label: 'User Management', icon: Shield, path: '/users', permission: 'view_users' },
 ];
 
 const futureItems = [
-  { label: 'AI Assistant', icon: Sparkles },
+  { label: 'AI Assistant', icon: Bot },
+  { label: 'RAG Knowledge Base', icon: Sparkles },
   { label: 'Parent Portal', icon: Globe },
-  { label: 'Registration', icon: UserPlus },
-  { label: 'Scheduling', icon: CalendarClock },
+  { label: 'Registration Automation', icon: UserPlus },
+  { label: 'Volunteer Scheduling', icon: CalendarClock },
   { label: 'Email Automation', icon: Mail },
-  { label: 'WhatsApp', icon: MessageCircle },
+  { label: 'WhatsApp Integration', icon: MessageCircle },
+  { label: 'Google Forms', icon: Workflow },
 ];
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
-  const { user, role, can } = useCurrentUser();
+  const { user, role, can, canViewAs } = useRole();
 
-  const filteredNav = navItems.filter(item => role === 'admin' || can(item.permission));
-
-  const roleLabels = {
-    admin: 'Administrator',
-    teacher: 'Teacher',
-    volunteer: 'Volunteer',
-    board_member: 'Board Member'
-  };
+  const filteredNav = navItems.filter(item => can(item.permission));
+  const showFuture = ['admin', 'co_leader'].includes(role);
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -73,7 +71,7 @@ export default function Sidebar() {
         <div className="mx-4 mb-4 p-3 rounded-lg bg-sidebar-accent/50 border border-sidebar-border">
           <p className="text-sm font-medium text-sidebar-foreground truncate">{user.full_name || user.email}</p>
           <Badge variant="outline" className="mt-1 text-[10px] border-sidebar-primary/40 text-sidebar-primary">
-            {roleLabels[role] || role}
+            {ROLE_LABELS[role] || role}
           </Badge>
         </div>
       )}
@@ -109,25 +107,31 @@ export default function Sidebar() {
           );
         })}
 
-        {/* Future Features */}
-        {role === 'admin' && (
+        {/* Future AI Features */}
+        {showFuture && (
           <>
             <p className={`text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/40 px-3 pt-4 pb-1 ${collapsed ? 'text-center' : ''}`}>
-              {collapsed ? '•' : 'Coming Soon'}
+              {collapsed ? '•' : 'Coming Soon · AI Modules'}
             </p>
             {futureItems.map(item => (
-              <div
-                key={item.label}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/30 cursor-not-allowed ${collapsed ? 'justify-center' : ''}`}
-              >
-                <item.icon className="w-4 h-4 flex-shrink-0" />
-                {!collapsed && (
-                  <span className="flex items-center gap-2">
-                    {item.label}
-                    <Badge variant="outline" className="text-[9px] border-sidebar-foreground/20 text-sidebar-foreground/30 px-1">Soon</Badge>
-                  </span>
-                )}
-              </div>
+              <TooltipProvider key={item.label} delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-sidebar-foreground/30 cursor-not-allowed ${collapsed ? 'justify-center' : ''}`}
+                    >
+                      <item.icon className="w-4 h-4 flex-shrink-0" />
+                      {!collapsed && (
+                        <span className="flex items-center gap-2">
+                          {item.label}
+                          <Badge variant="outline" className="text-[9px] border-sidebar-foreground/20 text-sidebar-foreground/30 px-1">Soon</Badge>
+                        </span>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  {collapsed && <TooltipContent side="right">{item.label} — Coming Soon</TooltipContent>}
+                </Tooltip>
+              </TooltipProvider>
             ))}
           </>
         )}
