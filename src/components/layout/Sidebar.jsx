@@ -23,7 +23,7 @@ const navItems = [
   { label: 'Classes', icon: BookOpen, path: '/classes', permission: 'view_classes' },
   { label: 'Attendance', icon: ClipboardList, path: '/attendance', permission: 'view_attendance' },
   { label: 'Events', icon: Calendar, path: '/events', permission: 'view_events' },
-  { label: 'Curriculum', icon: GraduationCap, path: '/curriculum', permission: 'view_curriculum' },
+  { label: 'Curriculum', icon: BookOpen, path: '/curriculum', permission: 'view_curriculum' },
   { label: 'Documents', icon: FileText, path: '/documents', permission: 'view_documents' },
   { label: 'Communications', icon: MessageSquare, path: '/communications', permission: 'view_communications' },
   { label: 'Tasks', icon: CheckSquare, path: '/tasks', permission: 'view_tasks' },
@@ -50,6 +50,7 @@ export default function Sidebar() {
 
   const filteredNav = navItems.filter(item => can(item.permission));
   const showFuture = ['admin', 'co_leader'].includes(role);
+  // Map role to user-friendly badge color
 
   const sidebarContent = (
     <div className="flex flex-col h-full">

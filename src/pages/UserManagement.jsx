@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Users, Search, Pencil, Shield, Save, X } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Users, Search, Pencil, Shield, Save, X, BookOpen, Calendar } from 'lucide-react';
 import PageHeader from '@/components/shared/PageHeader';
-import { ROLE_LABELS, ROLES } from '@/lib/rbac';
+import { ROLE_LABELS } from '@/lib/rbac';
 import { useRole } from '@/lib/RoleContext';
 
 const ROLE_OPTIONS = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
@@ -20,8 +21,7 @@ const roleBadgeColors = {
   admin: 'bg-red-100 text-red-700 border-red-200',
   co_leader: 'bg-purple-100 text-purple-700 border-purple-200',
   teacher: 'bg-blue-100 text-blue-700 border-blue-200',
-  co_teacher: 'bg-sky-100 text-sky-700 border-sky-200',
-  event_volunteer: 'bg-amber-100 text-amber-700 border-amber-200',
+  volunteer: 'bg-amber-100 text-amber-700 border-amber-200',
   board_rep: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   parent: 'bg-muted text-muted-foreground border-border',
 };
@@ -30,12 +30,21 @@ export default function UserManagement() {
   const { can } = useRole();
   const qc = useQueryClient();
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const [editUser, setEditUser] = useState(null);
   const [editData, setEditData] = useState({});
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: () => base44.entities.User.list(),
+  });
+  const { data: classes = [] } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => base44.entities.MinistryClass.list(),
+  });
+  const { data: events = [] } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => base44.entities.Event.list('-date', 50),
   });
 
   const updateMutation = useMutation({
@@ -46,17 +55,35 @@ export default function UserManagement() {
     },
   });
 
-  const filtered = users.filter(u =>
-    !search ||
-    (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
-    (u.email || '').toLowerCase().includes(search.toLowerCase()) ||
-    (u.role || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = users.filter(u => {
+    const matchSearch = !search ||
+      (u.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (u.email || '').toLowerCase().includes(search.toLowerCase());
+    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    return matchSearch && matchRole;
+  });
 
   const openEdit = (u) => {
     setEditUser(u);
-    setEditData({ role: u.role || 'event_volunteer', active: u.active !== false });
+    setEditData({
+      role: u.role || 'volunteer',
+      active: u.active !== false,
+      assigned_class_id: u.assigned_class_id || '',
+      assigned_event_ids: u.assigned_event_ids || [],
+    });
   };
+
+  const toggleEvent = (eventId) => {
+    setEditData(d => ({
+      ...d,
+      assigned_event_ids: d.assigned_event_ids.includes(eventId)
+        ? d.assigned_event_ids.filter(id => id !== eventId)
+        : [...d.assigned_event_ids, eventId],
+    }));
+  };
+
+  const getClassName = (id) => classes.find(c => c.id === id)?.name;
+  const getEventNames = (ids = []) => ids.map(id => events.find(e => e.id === id)?.name).filter(Boolean).join(', ');
 
   if (!can('view_users')) {
     return (
@@ -72,19 +99,45 @@ export default function UserManagement() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="User Management" subtitle="Manage roles and permissions for ministry members" />
+      <PageHeader
+        title="User Management"
+        subtitle="Manage roles, assignments, and permissions for ministry members"
+      />
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
+        {ROLE_OPTIONS.map(({ value, label }) => (
+          <button
+            key={value}
+            onClick={() => setRoleFilter(roleFilter === value ? 'all' : value)}
+            className={`p-3 rounded-xl border text-left transition-all ${roleFilter === value ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/30'}`}
+          >
+            <p className="text-xl font-bold">{users.filter(u => u.role === value).length}</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{label}</p>
+          </button>
+        ))}
+      </div>
 
       <Card className="border-0 shadow-sm overflow-hidden">
-        <div className="p-4 border-b flex items-center gap-3">
-          <div className="relative flex-1">
+        <div className="p-4 border-b flex flex-col sm:flex-row items-start sm:items-center gap-3">
+          <div className="relative flex-1 w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Search users by name, email, or role..."
+              placeholder="Search by name or email..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="pl-10 bg-muted/50 border-0"
             />
           </div>
+          <Select value={roleFilter} onValueChange={setRoleFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="Filter by role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Roles</SelectItem>
+              {ROLE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (
@@ -102,10 +155,22 @@ export default function UserManagement() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium truncate">{u.full_name || '(No name)'}</p>
                     <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {u.assigned_class_id && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                          <BookOpen className="w-3 h-3" />{getClassName(u.assigned_class_id) || 'Class'}
+                        </span>
+                      )}
+                      {u.assigned_event_ids?.length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                          <Calendar className="w-3 h-3" />{u.assigned_event_ids.length} event{u.assigned_event_ids.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
-                  <Badge variant="outline" className={`text-xs ${roleBadgeColors[u.role] || roleBadgeColors.parent}`}>
+                  <Badge variant="outline" className={`text-xs hidden sm:flex ${roleBadgeColors[u.role] || roleBadgeColors.parent}`}>
                     {ROLE_LABELS[u.role] || u.role || 'No role'}
                   </Badge>
                   {u.active === false && (
@@ -129,26 +194,15 @@ export default function UserManagement() {
         )}
       </Card>
 
-      {/* Role legend */}
-      <Card className="p-4 border-0 shadow-sm">
-        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Role Permissions Summary</p>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {ROLE_OPTIONS.map(({ value, label }) => (
-            <div key={value} className="flex items-center gap-2">
-              <span className={`w-2.5 h-2.5 rounded-full ${roleBadgeColors[value]?.split(' ')[0] || 'bg-muted'}`} />
-              <span className="text-xs text-muted-foreground">{label}</span>
-            </div>
-          ))}
-        </div>
-      </Card>
-
       {/* Edit Dialog */}
       <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit User — {editUser?.full_name || editUser?.email}</DialogTitle>
+            <DialogTitle className="font-heading">Edit User</DialogTitle>
+            <p className="text-sm text-muted-foreground">{editUser?.full_name || editUser?.email}</p>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-5 py-4">
+            {/* Role */}
             <div className="space-y-2">
               <Label>Role</Label>
               <Select value={editData.role} onValueChange={v => setEditData(d => ({ ...d, role: v }))}>
@@ -162,6 +216,47 @@ export default function UserManagement() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Assigned Class — show for teacher */}
+            {(editData.role === 'teacher') && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2"><BookOpen className="w-4 h-4" /> Assigned Class</Label>
+                <Select
+                  value={editData.assigned_class_id || '__none__'}
+                  onValueChange={v => setEditData(d => ({ ...d, assigned_class_id: v === '__none__' ? '' : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None —</SelectItem>
+                    {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Assigned Events — show for volunteer */}
+            {editData.role === 'volunteer' && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2"><Calendar className="w-4 h-4" /> Assigned Events</Label>
+                <div className="max-h-40 overflow-y-auto border rounded-lg p-3 space-y-2">
+                  {events.length === 0 && <p className="text-xs text-muted-foreground">No events available</p>}
+                  {events.map(e => (
+                    <div key={e.id} className="flex items-center gap-2">
+                      <Checkbox
+                        id={`evt-${e.id}`}
+                        checked={(editData.assigned_event_ids || []).includes(e.id)}
+                        onCheckedChange={() => toggleEvent(e.id)}
+                      />
+                      <label htmlFor={`evt-${e.id}`} className="text-sm cursor-pointer">{e.name}</label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Active toggle */}
             <div className="flex items-center justify-between">
               <Label>Active</Label>
               <Switch checked={editData.active} onCheckedChange={v => setEditData(d => ({ ...d, active: v }))} />

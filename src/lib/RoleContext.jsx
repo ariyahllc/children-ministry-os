@@ -16,7 +16,7 @@ export function RoleProvider({ children }) {
     }).catch(() => setLoading(false));
   }, []);
 
-  const actualRole = user?.role || 'event_volunteer';
+  const actualRole = user?.role || 'volunteer';
   // If viewAsRole is set (and user is admin/co_leader), use that for UI rendering
   const effectiveRole = viewAsRole || actualRole;
 

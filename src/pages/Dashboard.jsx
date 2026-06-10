@@ -12,8 +12,7 @@ const DASHBOARD_MAP = {
   admin: AdminDashboard,
   co_leader: AdminDashboard,
   teacher: TeacherDashboard,
-  co_teacher: TeacherDashboard,
-  event_volunteer: VolunteerDashboard,
+  volunteer: VolunteerDashboard,
   board_rep: BoardDashboard,
   parent: ParentDashboard,
 };

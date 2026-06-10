@@ -1,6 +1,6 @@
 import React from 'react';
 import { useRole } from '@/lib/RoleContext';
-import { ROLE_LABELS, ROLES } from '@/lib/rbac';
+import { ROLE_LABELS } from '@/lib/rbac';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Eye, X } from 'lucide-react';

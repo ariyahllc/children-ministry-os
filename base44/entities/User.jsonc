@@ -8,20 +8,16 @@
         "admin",
         "co_leader",
         "teacher",
-        "co_teacher",
-        "event_volunteer",
+        "volunteer",
         "board_rep",
         "parent"
       ],
-      "default": "event_volunteer",
+      "default": "volunteer",
       "description": "User role"
     },
-    "assigned_class_ids": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "Assigned class IDs (for teachers/co-teachers)"
+    "assigned_class_id": {
+      "type": "string",
+      "description": "Assigned class ID (for teachers)"
     },
     "assigned_event_ids": {
       "type": "array",
