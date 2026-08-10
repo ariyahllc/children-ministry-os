@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CM Planner — preview</title>
+<style>
+  :root{
+    --bg:#f4f5f8; --card:#fff; --line:#e9ebf1; --ink:#1e2330; --muted:#71768a;
+    --pri:#4f46e5; --pri2:#6366f1; --pri-ink:#fff; --ok:#10b981; --warn:#f59e0b; --bad:#ef4444;
+    --chip:#eef1fe; --chip-ink:#4338ca;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased}
+  a{color:var(--pri);text-decoration:none;cursor:pointer}
+  a:hover{opacity:.82}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 13px;color:var(--ink);font-weight:500;transition:.15s}
+  button:hover{background:#f6f7fb;border-color:#d7dae6}
+  button.primary{background:linear-gradient(135deg,var(--pri2),var(--pri));color:var(--pri-ink);border:none;box-shadow:0 1px 2px rgba(79,70,229,.35)}
+  button.primary:hover{filter:brightness(1.06)}
+  button.sm{padding:5px 10px;font-size:13px;border-radius:7px}
+  select{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+  .topbar{display:flex;align-items:center;gap:12px;padding:12px 20px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);box-shadow:0 1px 3px rgba(20,24,40,.03)}
+  .brand{font-weight:700;display:flex;align-items:center;gap:9px;letter-spacing:-.01em}
+  .brand .dot{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--pri2),var(--pri));color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 6px rgba(79,70,229,.35)}
+  .spacer{flex:1}
+  .me{text-align:right;line-height:1.25}
+  .me .nm{font-weight:600;font-size:13px}
+  .me .rl{font-size:11px;color:var(--muted)}
+  .rolebar{display:flex;align-items:center;gap:8px;padding:9px 20px;background:#fffdf4;border-bottom:1px solid #f1e6c4;font-size:12px;color:#8a6d1a;flex-wrap:wrap}
+  .rolebar select{width:auto;padding:5px 9px;border:1px solid #e6d6a0;border-radius:7px;background:#fff}
+  .nav{display:flex;gap:4px;padding:9px 20px;background:#fff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .nav button{border:none;background:transparent;border-radius:9px;color:var(--muted);font-weight:500;padding:7px 13px}
+  .nav button:hover{background:#f4f5f8;color:var(--ink)}
+  .nav button.active{background:var(--chip);color:var(--chip-ink)}
+  .wrap{max-width:1000px;margin:0 auto;padding:22px 20px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+  h2{font-size:21px;margin:0;letter-spacing:-.02em;font-weight:700}
+  h3{font-size:15px;margin:0 0 8px;letter-spacing:-.01em}
+  .grid{display:grid;gap:13px}
+  .cards{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(20,24,40,.04)}
+  .card.click{cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s}
+  .card.click:hover{border-color:#c7cbf7;box-shadow:0 6px 18px rgba(30,35,60,.09);transform:translateY(-2px)}
+  .chip{display:inline-block;font-size:11px;padding:3px 9px;border-radius:999px;background:var(--chip);color:var(--chip-ink);font-weight:600}
+  .muted{color:var(--muted)}
+  .small{font-size:12px}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(20,24,40,.04)}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:13px;vertical-align:middle}
+  th{background:#fafbfd;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+  tbody tr{transition:background .12s}
+  tbody tr:hover{background:#fafbff}
+  tr:last-child td{border-bottom:none}
+  .bar{height:8px;background:#eef0f6;border-radius:999px;overflow:hidden;margin-top:8px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,#34d399,var(--ok));border-radius:999px;transition:width .3s}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:600}
+  .p-Pending{background:#fef3c7;color:#92400e}
+  .p-InProgress{background:#dbeafe;color:#1e40af}
+  .p-Completed{background:#d1fae5;color:#065f46}
+  .cd-over{color:var(--bad);font-weight:600}
+  .cd-soon{color:var(--warn);font-weight:600}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(20,24,40,.04)}
+  .kpi b{font-size:23px;display:block;letter-spacing:-.02em}
+  .empty{text-align:center;color:var(--muted);padding:40px;background:#fff;border:1px dashed var(--line);border-radius:14px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand"><span class="dot">CM</span> Planner</div>
+  <div class="spacer"></div>
+  <div class="me"><div class="nm" id="meNm">Dorothy</div><div class="rl" id="meRl">Co-leader</div></div>
+</div>
+<div class="rolebar">
+  <span>Preview — sign in as:</span>
+  <select id="who" onchange="setWho(this.value)">
+    <option value="dorothy">Dorothy — Co-leader</option>
+    <option value="neil">Neil — Teacher</option>
+    <option value="shirisha">Shirisha — Board rep</option>
+  </select>
+  <span class="muted">(same app, different view by role)</span>
+</div>
+<div class="nav" id="nav"></div>
+<div class="wrap" id="view"></div>
+
+<script>
+var TODAY=new Date(2026,6,28);
+var WHO={
+  dorothy:{name:'Dorothy',role:'Co-leader',key:'co_leader'},
+  neil:{name:'Neil',role:'Teacher',key:'teacher'},
+  shirisha:{name:'Shirisha',role:'Board rep',key:'board_rep'}
+};
+var me=WHO.dorothy, VIEW='events', OPEN=null;
+
+var epics=[
+  {id:'cs',name:"Children's Sunday",type:"Children's Sunday",date:'2026-09-13',status:'Planning'},
+  {id:'to',name:'Teachers Orientation',type:'Special',date:'2026-08-16',status:'In Progress'},
+  {id:'ah',name:'Angel House - Outreach',type:'Outreach',date:'2026-09-20',status:'Upcoming'},
+  {id:'o2',name:'Outreach 2026-27',type:'Outreach',date:'2026-10-10',status:'Planning'},
+  {id:'occ',name:'OCC - Volunteering',type:'Outreach',date:'2026-11-15',status:'Upcoming'},
+  {id:'mt',name:'Missions Trip 2027',type:'Missions Trip',date:'2027-06-20',status:'Planning'},
+  {id:'bd',name:'Birthdays',type:'Other',date:'',status:'Planning'}
+];
+var tasks=[
+  ['cs','Confirm preaching Pastor (Board sign-off)','Dorothy','-12w','Completed'],
+  ['cs','Organize teachers meeting','Dorothy','-6w','Completed'],
+  ['cs','Message Praise & Worship kids','Dorothy','-6w','Completed'],
+  ['cs','Order trophies & certificates','Dorothy','-4w','Completed'],
+  ['cs','Create 2026-27 certificates','Dinesh','-4w','Completed'],
+  ['cs','Prepare CM year-in-review video','Dinesh','-4w','In Progress'],
+  ['cs','Collect ADC pics for video','Dinesh','-4w','In Progress'],
+  ['cs','Prepare class pictures (Palm/Easter)','Neil','-3w','In Progress'],
+  ['cs','Message parents to verify name spelling','Dorothy','-3w','Pending'],
+  ['cs','Request announcements from Board','Dinesh','-3w','Pending'],
+  ['cs','Middle school presentation prep','Neil','-2w','Pending'],
+  ['cs','Book soundcheck with media','Dinesh','-1w','Pending'],
+  ['cs','Brief photographer: one group picture','Dinesh','-1w','Pending'],
+  ['cs','Buy gift bags (seniors + baptism)','Dorothy','-1w','Pending'],
+  ['to','Confirm venue and date','Dorothy','-4w','Completed'],
+  ['to','Prepare teacher handbook','Neil','-2w','In Progress'],
+  ['to','Send invites to all teachers','Dorothy','-1w','Pending'],
+  ['ah','Confirm volunteer list','Neil','-3w','Pending'],
+  ['ah','Arrange transport','Dorothy','-2w','Pending'],
+  ['o2','Plan outreach calendar','Dorothy','-6w','In Progress']
+].map(function(t,i){return {id:'t'+i,epic:t[0],title:t[1],owner:t[2],offset:t[3],status:t[4]};});
+
+var feedback={cs:['Audio was not great — assign a soundcheck owner','No individual pictures for awards — inform photographer','Freeze all decisions 2 weeks before']};
+
+function parseD(s){if(!s)return null;var m=s.match(/(\d{4})-(\d{2})-(\d{2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;}
+function dueDate(ev,off){var d=parseD(ev);if(!d)return null;var m=off.match(/([+-]?\d+)([dwm])/);if(m){var n=+m[1];if(m[2]==='d')d.setDate(d.getDate()+n);else if(m[2]==='w')d.setDate(d.getDate()+n*7);else d.setMonth(d.getMonth()+n);}return d;}
+function fmt(d){return d?d.toLocaleDateString(undefined,{month:'short',day:'numeric'}):'—';}
+function countdown(d){if(!d)return{t:'—',c:''};var days=Math.round((d-TODAY)/86400000);if(days<0)return{t:'overdue '+(-days)+'d',c:'cd-over'};if(days===0)return{t:'today',c:'cd-soon'};if(days<=14)return{t:'in '+days+'d',c:'cd-soon'};return{t:'in '+Math.round(days/7)+' wk',c:''};}
+function sc(s){return 'p-'+s.replace(/\s/g,'');}
+function esc(s){return String(s).replace(/[&<>]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[c];});}
+function epicTasks(id){return tasks.filter(function(t){return t.epic===id;});}
+function prog(id){var ts=epicTasks(id);if(!ts.length)return 0;return Math.round(ts.filter(function(t){return t.status==='Completed';}).length/ts.length*100);}
+
+function setWho(k){me=WHO[k];document.getElementById('meNm').textContent=me.name;document.getElementById('meRl').textContent=me.role;VIEW=(me.key==='teacher')?'mytasks':'events';OPEN=null;render();}
+
+function navItems(){
+  if(me.key==='teacher')return [['mytasks','My tasks'],['events','Events'],['calendar','Calendar']];
+  if(me.key==='board_rep')return [['events','Events'],['calendar','Calendar']];
+  return [['dashboard','Dashboard'],['events','Events'],['calendar','Calendar'],['members','Members']];
+}
+function render(){
+  var nav=document.getElementById('nav');
+  nav.innerHTML=navItems().map(function(i){return '<button class="'+(VIEW===i[0]?'active':'')+'" onclick="go(\''+i[0]+'\')">'+i[1]+'</button>';}).join('');
+  var v=document.getElementById('view');
+  if(OPEN){v.innerHTML=epicDetail(OPEN);return;}
+  if(VIEW==='events')v.innerHTML=eventsView();
+  else if(VIEW==='mytasks')v.innerHTML=myTasksView();
+  else if(VIEW==='dashboard')v.innerHTML=dashboardView();
+  else if(VIEW==='calendar')v.innerHTML=calendarView();
+  else if(VIEW==='members')v.innerHTML=membersView();
+}
+function go(v){VIEW=v;OPEN=null;render();}
+function open_(id){OPEN=id;render();}
+function back(){OPEN=null;render();}
+
+function eventsView(){
+  var lead=me.key==='co_leader';
+  return '<div class="row"><h2>Events</h2>'+(lead?'<button class="primary">+ New event</button>':'')+'</div>'
+    +'<div class="grid cards">'+epics.map(function(e){
+      var p=prog(e.id),ts=epicTasks(e.id),done=ts.filter(function(t){return t.status==='Completed';}).length;
+      var cd=countdown(parseD(e.date));
+      return '<div class="card click" onclick="open_(\''+e.id+'\')">'
+        +'<div class="row" style="margin-bottom:6px"><b>'+esc(e.name)+'</b><span class="chip">'+esc(e.type)+'</span></div>'
+        +'<div class="small muted">'+(e.date?('Event '+fmt(parseD(e.date))+' · <span class="'+cd.c+'">'+cd.t+'</span>'):'Ongoing')+'</div>'
+        +'<div class="bar"><i style="width:'+p+'%"></i></div>'
+        +'<div class="small muted" style="margin-top:6px">'+done+' / '+ts.length+' tasks done</div>'
+        +'</div>';
+    }).join('')+'</div>';
+}
+function epicDetail(id){
+  var e=epics.filter(function(x){return x.id===id;})[0];
+  var ts=epicTasks(id),lead=me.key==='co_leader';
+  var done=ts.filter(function(t){return t.status==='Completed';}).length;
+  var over=ts.filter(function(t){var d=dueDate(e.date,t.offset);return d&&t.status!=='Completed'&&(d-TODAY)<0;}).length;
+  var cd=countdown(parseD(e.date));
+  var h='<div class="row"><div><a onclick="back()">← Events</a><h2 style="margin-top:6px">'+esc(e.name)+'</h2></div>'+(lead?'<button class="primary">+ Add task</button>':'')+'</div>';
+  h+='<div class="small muted" style="margin-bottom:12px">'+(e.date?('Event day '+fmt(parseD(e.date))+' · <span class="'+cd.c+'">'+cd.t+'</span>'):'Ongoing')+'</div>';
+  h+='<div class="kpis"><div class="kpi"><b>'+ts.length+'</b><span class="muted small">tasks</span></div>'
+    +'<div class="kpi"><b>'+done+'</b><span class="muted small">done</span></div>'
+    +'<div class="kpi"><b>'+over+'</b><span class="muted small">overdue</span></div></div>';
+  h+='<table><thead><tr><th>Task</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>';
+  h+=ts.map(function(t){
+    var d=dueDate(e.date,t.offset),cd=countdown(d);
+    var mine=t.owner===me.name;
+    var canEdit=lead||(me.key==='teacher'&&mine);
+    return '<tr'+(mine?' style="background:#fafaff"':'')+'><td>'+esc(t.title)+'</td>'
+      +'<td><span class="chip">'+esc(t.owner)+'</span></td>'
+      +'<td class="small">'+t.offset+' · '+fmt(d)+' <span class="'+cd.c+'">('+cd.t+')</span></td>'
+      +'<td><span class="pill '+sc(t.status)+'">'+t.status+'</span>'+(canEdit&&t.status!=='Completed'?' <a class="small" onclick="mark(\''+t.id+'\')">✓ done</a>':'')+'</td></tr>';
+  }).join('')+'</tbody></table>';
+  var fb=feedback[id]||[];
+  if(fb.length){h+='<h3 style="margin-top:22px">Feedback → next year</h3><table><tbody>'
+    +fb.map(function(f){return '<tr><td>'+esc(f)+'</td><td class="small" style="width:1%;white-space:nowrap">'+(lead?'<a>→ Make task</a>':'')+'</td></tr>';}).join('')+'</tbody></table>';}
+  return h;
+}
+function mark(tid){var t=tasks.filter(function(x){return x.id===tid;})[0];if(t)t.status='Completed';render();}
+function myTasksView(){
+  var mine=tasks.filter(function(t){return t.owner===me.name;});
+  var h='<div class="row"><h2>My tasks</h2></div><p class="small muted">Everything assigned to you, across every event — sorted by what\'s due next.</p>';
+  if(!mine.length)return h+'<div class="empty">Nothing assigned to you yet.</div>';
+  mine.sort(function(a,b){var da=dueDate(epicById(a.epic).date,a.offset),db=dueDate(epicById(b.epic).date,b.offset);return (da||0)-(db||0);});
+  h+='<table><thead><tr><th>Task</th><th>Event</th><th>Due</th><th>Status</th></tr></thead><tbody>';
+  h+=mine.map(function(t){var e=epicById(t.epic),d=dueDate(e.date,t.offset),cd=countdown(d);
+    return '<tr><td>'+esc(t.title)+'</td><td class="small muted">'+esc(e.name)+'</td>'
+      +'<td class="small">'+fmt(d)+' <span class="'+cd.c+'">('+cd.t+')</span></td>'
+      +'<td><span class="pill '+sc(t.status)+'">'+t.status+'</span>'+(t.status!=='Completed'?' <a class="small" onclick="mark(\''+t.id+'\')">✓ done</a>':'')+'</td></tr>';
+  }).join('')+'</tbody></table>';
+  return h;
+}
+function epicById(id){return epics.filter(function(e){return e.id===id;})[0];}
+function dashboardView(){
+  var totalT=tasks.length,done=tasks.filter(function(t){return t.status==='Completed';}).length;
+  var over=tasks.filter(function(t){var d=dueDate(epicById(t.epic).date,t.offset);return d&&t.status!=='Completed'&&(d-TODAY)<0;}).length;
+  var h='<div class="row"><h2>Dashboard</h2></div>';
+  h+='<div class="kpis"><div class="kpi"><b>'+epics.length+'</b><span class="muted small">events</span></div>'
+    +'<div class="kpi"><b>'+totalT+'</b><span class="muted small">tasks</span></div>'
+    +'<div class="kpi"><b>'+done+'</b><span class="muted small">done</span></div>'
+    +'<div class="kpi"><b style="color:var(--bad)">'+over+'</b><span class="muted small">overdue</span></div></div>';
+  h+='<h3>Events by progress</h3><div class="grid cards">'+epics.map(function(e){var p=prog(e.id);
+    return '<div class="card click" onclick="open_(\''+e.id+'\')"><div class="row" style="margin-bottom:6px"><b>'+esc(e.name)+'</b><span class="small muted">'+p+'%</span></div><div class="bar"><i style="width:'+p+'%"></i></div></div>';
+  }).join('')+'</div>';
+  return h;
+}
+function calendarView(){
+  var dated=epics.filter(function(e){return e.date;}).sort(function(a,b){return parseD(a.date)-parseD(b.date);});
+  var h='<div class="row"><h2>Calendar of events</h2></div><p class="small muted">Visible to everyone — all events by date.</p><table><thead><tr><th>Date</th><th>Event</th><th>Countdown</th></tr></thead><tbody>';
+  h+=dated.map(function(e){var cd=countdown(parseD(e.date));return '<tr><td class="small">'+fmt(parseD(e.date))+' '+parseD(e.date).getFullYear()+'</td><td>'+esc(e.name)+'</td><td class="small '+cd.c+'">'+cd.t+'</td></tr>';}).join('')+'</tbody></table>';
+  return h;
+}
+function membersView(){
+  var rows=[['Dinesh','dinesh@acfi.cc','Admin','auto'],['Dorothy','dorothy@acfi.cc','Co-leader','auto'],['Shirisha','shirisha@acfi.cc','Board rep','auto'],['Neil','neil.k@gmail.com','Teacher','signin'],['Stella','stella@gmail.com','Co-teacher','signin'],['Nalini','nalini@acfi.cc','Treasurer','auto']];
+  var h='<div class="row"><h2>Members</h2><button class="primary">+ Add member</button></div><p class="small muted">@acfi.cc members sign in automatically. Personal-Gmail members use Sign in with Google.</p>';
+  h+='<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Sign-in</th></tr></thead><tbody>';
+  h+=rows.map(function(r){return '<tr><td>'+r[0]+'</td><td class="small">'+r[1]+'</td><td><span class="chip">'+r[2]+'</span></td><td class="small muted">'+(r[3]==='auto'?'auto (domain)':'Google sign-in')+'</td></tr>';}).join('')+'</tbody></table>';
+  return h;
+}
+render();
+</script>
+</body>
+</html>

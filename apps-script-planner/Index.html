@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f3f1ea; --card:#fffdf8; --line:#e7e2d6; --ink:#1b2620; --muted:#727568;
+    --subtle:#f6f4ec; --hover:#f2f0e7;
+    --pri:#1f4d39; --pri2:#2c6b4f; --pri-ink:#fbfdf9; --ok:#2f855a; --warn:#b9822c; --bad:#bf4a30;
+    --chip:#e5eee6; --chip-ink:#1f4d39; --gold:#c69749; --shadow:rgba(26,34,28,.07);
+  }
+  :root.dark{
+    --bg:#22262a; --card:#2b3035; --line:#3b4147; --ink:#e9ebe9; --muted:#9ba1a1;
+    --subtle:#2f353a; --hover:#343b41;
+    --pri:#4a9c74; --pri2:#57ad84; --pri-ink:#0e130c; --ok:#57b98c; --warn:#d6a24a; --bad:#e06a4f;
+    --chip:#2c3a32; --chip-ink:#aee5c6; --gold:#d8b56a; --shadow:rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;-webkit-font-smoothing:antialiased;transition:background .2s,color .2s}
+  a{color:var(--pri);text-decoration:none;cursor:pointer;font-weight:500}
+  a:hover{opacity:.8}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 13px;color:var(--ink);font-weight:500;transition:.15s}
+  button:hover{background:var(--subtle);border-color:var(--muted)}
+  button.primary{background:linear-gradient(135deg,var(--pri2),var(--pri));color:var(--pri-ink);border:none;box-shadow:0 2px 8px rgba(31,77,57,.25)}
+  button.primary:hover{filter:brightness(1.08)}
+  button.danger{color:var(--bad);border-color:var(--bad)}
+  button.sm{padding:5px 10px;font-size:13px;border-radius:7px}
+  input,select,textarea{font:inherit;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);transition:.15s}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px var(--chip)}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;font-weight:500}
+  .topbar{display:flex;align-items:center;gap:12px;padding:13px 22px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+  .brand{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:19px;display:flex;align-items:center;gap:10px;letter-spacing:-.01em}
+  .brand .dot{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,var(--pri2),var(--pri));color:var(--pri-ink);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(31,77,57,.3)}
+  .spacer{flex:1}
+  .me{text-align:right;line-height:1.25}
+  .me .nm{font-weight:600;font-size:13px}
+  .nav{display:flex;gap:4px;padding:9px 22px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:59px;z-index:4}
+  .nav button{border:none;background:transparent;border-radius:9px;color:var(--muted);font-weight:500;padding:7px 14px}
+  .nav button:hover{background:var(--subtle);color:var(--ink)}
+  .nav button.active{background:var(--chip);color:var(--chip-ink)}
+  .wrap{max-width:1060px;margin:0 auto;padding:24px 22px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  h2{font-family:'Fraunces',Georgia,serif;font-size:26px;margin:0;letter-spacing:-.01em;font-weight:600}
+  h3{font-family:'Fraunces',Georgia,serif;font-size:17px;margin:0 0 8px;font-weight:600}
+  .grid{display:grid;gap:13px}
+  .cards{grid-template-columns:repeat(auto-fill,minmax(258px,1fr))}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 1px 3px var(--shadow)}
+  .card.click{cursor:pointer;transition:.14s}
+  .card.click:hover{border-color:var(--pri2);box-shadow:0 8px 22px var(--shadow);transform:translateY(-2px)}
+  .chip{display:inline-block;font-size:11px;padding:3px 10px;border-radius:999px;background:var(--chip);color:var(--chip-ink);font-weight:600}
+  .muted{color:var(--muted)}
+  .small{font-size:12px}
+  table{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 1px 3px var(--shadow)}
+  th,td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+  td{font-size:14px;line-height:1.55;color:var(--ink)}
+  td.small,td .small{font-size:12.5px}
+  th{background:var(--subtle);font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;vertical-align:middle;white-space:nowrap}
+  td.nowrap,th.nowrap{white-space:nowrap}
+  tbody tr{transition:background .12s}
+  tbody tr:hover{background:var(--hover)}
+  tr:last-child td{border-bottom:none}
+  .bar{height:8px;background:var(--subtle);border-radius:999px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--pri2),var(--pri));border-radius:999px;transition:width .3s}
+  .pill{font-size:11px;padding:3px 9px;border-radius:999px;font-weight:600;white-space:nowrap;display:inline-block}
+  .p-Pending{background:#f4e7c6;color:#8a6412}
+  .p-InProgress{background:#d3e4f0;color:#1e466b}
+  .p-Completed{background:#cfe8d8;color:#1f5a3c}
+  .p-over{background:#f3d6cd;color:#8f2f1a}
+  .cd-over{color:var(--bad);font-weight:600}
+  .cd-soon{color:var(--warn);font-weight:600}
+  .cd-done{color:var(--ok);font-weight:600}
+  .empty{text-align:center;color:var(--muted);padding:40px;background:var(--card);border:1px dashed var(--line);border-radius:14px}
+  .backdrop{position:fixed;inset:0;background:rgba(10,14,10,.55);backdrop-filter:blur(2px);display:flex;align-items:flex-start;justify-content:center;padding:44px 16px;z-index:20;overflow:auto}
+  .modal{background:var(--card);border:1px solid var(--line);border-radius:16px;width:100%;max-width:480px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+  .modal h3{font-size:18px}
+  .modal .actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:11px;z-index:40;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.3)}
+  .center{min-height:70vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(122px,1fr));gap:12px;margin-bottom:18px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:0 1px 3px var(--shadow)}
+  .kpi b{font-family:'Fraunces',Georgia,serif;font-size:26px;display:block}
+  .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .attrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;cursor:pointer;user-select:none;font-weight:500;transition:.12s}
+  .attrow:hover{border-color:var(--muted)}
+  .attrow.on{background:var(--chip);border-color:var(--pri2);color:var(--chip-ink)}
+  .tgl{display:inline-block;vertical-align:middle;width:44px;height:26px;border-radius:999px;background:var(--line);position:relative;flex:0 0 auto;transition:.15s}
+  .tgl:after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .attrow.on .tgl{background:var(--pri)}
+  .attrow.on .tgl:after{left:21px}
+  .tgl.on{background:var(--pri)}
+  .tgl.on:after{left:21px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
+  .seg button{border:none;border-radius:0;background:var(--card);color:var(--muted);padding:6px 13px;font-size:13px}
+  .seg button.on{background:var(--chip);color:var(--chip-ink);font-weight:600}
+  .prog{border-bottom:1px solid var(--line)}
+  .prog>summary{cursor:pointer;font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:600;padding:12px 0;list-style:none;display:flex;align-items:center;gap:9px}
+  .prog>summary::-webkit-details-marker{display:none}
+  .prog>summary:before{content:'▸';color:var(--muted);transition:transform .15s;font-size:13px}
+  .prog[open]>summary:before{transform:rotate(90deg)}
+  .prog[open]>summary{margin-bottom:4px}
+  /* Ask Dorothy */
+  #doro{position:fixed;right:20px;bottom:20px;z-index:50}
+  .doro-btn{background:var(--pri);color:var(--pri-ink);border:none;border-radius:22px;padding:11px 18px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.22)}
+  .doro-btn:hover{background:var(--pri2);border:none}
+  .doro-panel{position:absolute;right:0;bottom:54px;width:370px;max-width:calc(100vw - 40px);height:520px;max-height:calc(100vh - 120px);display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.28);overflow:hidden}
+  .doro-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:13px 15px;background:var(--pri);color:var(--pri-ink)}
+  .doro-head b{font-family:'Fraunces',Georgia,serif;font-size:16px}
+  .doro-sub{font-size:11px;opacity:.85}
+  .doro-x{background:transparent;border:none;color:var(--pri-ink);padding:2px 6px}
+  .doro-x:hover{background:rgba(255,255,255,.15);border:none}
+  .doro-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .doro-msg{padding:9px 12px;border-radius:12px;font-size:14px;line-height:1.45;max-width:88%;white-space:normal;word-wrap:break-word}
+  .doro-msg.user{align-self:flex-end;background:var(--pri);color:var(--pri-ink);border-bottom-right-radius:4px}
+  .doro-msg.dory{align-self:flex-start;background:var(--subtle);color:var(--ink);border-bottom-left-radius:4px}
+  .doro-typing{opacity:.7;font-style:italic}
+  .doro-hint{color:var(--muted);font-size:13px}
+  .doro-sugg{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+  .doro-chip{text-align:left;background:var(--subtle);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:13px;color:var(--ink)}
+  .doro-chip:hover{border-color:var(--pri)}
+  .doro-input{display:flex;gap:7px;padding:10px;border-top:1px solid var(--line)}
+  .doro-input textarea{resize:none;border-radius:10px;max-height:90px}
+  .doro-send{background:var(--pri);color:var(--pri-ink);border:none;border-radius:10px;padding:0 14px;font-size:15px}
+  .doro-send:hover{background:var(--pri2);border:none}
+  .doro-send:disabled{opacity:.5}
+  .doro-action{align-self:flex-start;max-width:88%;background:var(--subtle);border:1px dashed var(--pri);border-radius:12px;padding:10px 12px;margin-top:-4px}
+  .doro-action.done{border-style:solid;border-color:var(--ok);color:var(--ok)}
+  .doro-action .doro-do{margin-top:8px;background:var(--pri);color:var(--pri-ink);border:none;border-radius:9px;padding:6px 12px;font-size:13px;font-weight:600}
+  .doro-action .doro-do:hover{background:var(--pri2)}
+  .doro-foot{padding:7px 12px;font-size:10.5px;color:var(--muted);border-top:1px solid var(--line);text-align:center}
+</style>
+</head>
+<body>
+<div id="root"><div class="center">Loading…</div></div>
+
+<script>
+/* Personal invite token injected by the server from the ?k=… link. */
+var SERVER_TOKEN='<?= inviteToken ?>';
+var TOKEN='';
+
+/* ------------ tiny helpers ------------ */
+/* Every server call carries the caller's token as its first argument; the
+   backend resolves it (or falls back to @acfi.cc domain identity). */
+function api(fn){var a=[].slice.call(arguments,1);return new Promise(function(res,rej){google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn].apply(google.script.run,[TOKEN].concat(a));});}
+function copyText(t){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){toast('Link copied');},function(){window.prompt('Copy this invite link:',t);});}else{window.prompt('Copy this invite link:',t);}}
+function currentTheme(){try{return localStorage.getItem('cmp_theme')||'light';}catch(e){return 'light';}}
+function applyTheme(t){document.documentElement.classList.toggle('dark',t==='dark');try{localStorage.setItem('cmp_theme',t);}catch(e){}}
+function toggleTheme(){var t=currentTheme()==='dark'?'light':'dark';applyTheme(t);var b=$('#theme');if(b)b.textContent=t==='dark'?'☀':'🌙';}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+function $(sel,root){return (root||document).querySelector(sel);}
+function today(){var d=new Date();return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+function parseD(s){if(!s)return null;var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return new Date(+m[1],+m[2]-1,+m[3]);var d=new Date(s);return isNaN(d.getTime())?null:new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+function toast(msg){var t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove();},2200);}
+function statusClass(s){return 'p-'+String(s||'Pending').replace(/\s/g,'');}
+function countdown(due){var d=parseD(due);if(!d)return{txt:'—',cls:''};var ms=d-today();var days=Math.round(ms/86400000);
+  if(days<0)return{txt:'overdue '+(-days)+'d',cls:'cd-over'};
+  if(days===0)return{txt:'today',cls:'cd-soon'};
+  if(days<=14)return{txt:'in '+days+'d',cls:'cd-soon'};
+  var wk=Math.round(days/7);return{txt:'in '+wk+' wk',cls:''};}
+function money(n){n=Number(n)||0;return '$'+n.toLocaleString(undefined,{maximumFractionDigits:0});}
+
+var S=null, VIEW='dashboard', EPIC=null;
+
+/* ------------ boot ------------ */
+function boot(){
+  applyTheme(currentTheme());
+  if(typeof google==='undefined'||!google.script||!google.script.run){
+    $('#root').innerHTML='<div class="center"><div class="card" style="max-width:470px;text-align:left">'
+      +'<h2>Open this from the web-app link</h2>'
+      +'<p class="muted">This page only works when Google Apps Script serves it — that\'s what provides sign-in and data. It can\'t run as a plain file.</p>'
+      +'<p class="small">Fix: in the Apps Script editor, <b>Deploy → Test deployments</b> (or <b>Deploy → New deployment → Web app</b>), then open the <b>Web app URL</b> it gives you.</p>'
+      +'</div></div>';
+    return;
+  }
+  // Prefer a fresh invite token from the link; otherwise reuse a stored one.
+  if(SERVER_TOKEN){TOKEN=SERVER_TOKEN;try{localStorage.setItem('cmp_token',SERVER_TOKEN);}catch(e){}}
+  else{try{TOKEN=localStorage.getItem('cmp_token')||'';}catch(e){TOKEN='';}}
+  api('getBootstrap').then(function(d){S=d;if(!d.access){renderNoAccess();return;}render();}).catch(fatal);
+}
+function fatal(e){var m=(e&&e.message)||String(e);$('#root').innerHTML='<div class="center"><div><h2>Something went wrong</h2><p class="muted">'+esc(m)+'</p></div></div>';}
+
+/* ------------ google sign-in (personal Gmail) ------------ */
+function startSignIn(){
+  var nonce='s'+Math.random().toString(36).slice(2)+Date.now().toString(36);
+  var w=window.open('','cmsignin','width=480,height=640'); // open on the click so it isn't blocked
+  api('getAuthUrl',nonce).then(function(url){
+    if(w){w.location.href=url;}else{w=window.open(url,'cmsignin','width=480,height=640');}
+    pollSign(nonce,w);
+  }).catch(function(e){try{w&&w.close();}catch(_){}apiErr(e);});
+}
+function pollSign(nonce,w){
+  var n=0,iv=setInterval(function(){
+    n++;
+    api('pollSignIn',nonce).then(function(sess){
+      if(sess){clearInterval(iv);try{w&&w.close();}catch(e){}TOKEN=sess;try{localStorage.setItem('cmp_token',sess);}catch(e){}rebootstrap();}
+      else if(n>150){clearInterval(iv);} // ~5 min
+    });
+  },2000);
+}
+function rebootstrap(){$('#root').innerHTML='<div class="center">Loading…</div>';api('getBootstrap').then(function(d){S=d;if(!d.access){renderNoAccess();return;}render();}).catch(fatal);}
+function signOut(){api('signOut').then(finishSignOut,finishSignOut);}
+function finishSignOut(){TOKEN='';try{localStorage.removeItem('cmp_token');}catch(e){}S={access:false,email:''};renderNoAccess();}
+function renderNoAccess(){
+  var email=S.email||'';
+  var msg = email
+    ? 'You\'re signed in as <b>'+esc(email)+'</b>, but you\'re not on the planner yet.'
+    : 'Sign in with the Google account your admin added for you.';
+  $('#root').innerHTML='<div class="center"><div class="card" style="max-width:420px">'
+    +'<h2>Access needed</h2>'
+    +'<p class="muted">'+msg+'</p>'
+    +'<button class="primary" id="siBtn" style="margin-top:6px">Sign in with Google</button>'
+    +'<p class="small muted" style="margin-top:12px">Not a member yet? Ask an admin (Dinesh or Dorothy) to add you.</p>'
+    +'</div></div>';
+  var b=$('#siBtn'); if(b)b.onclick=startSignIn;
+}
+
+/* ------------ shell ------------ */
+function navFor(role){
+  var items=[['dashboard','Dashboard']];
+  if(S.meta.canViewChildren)items.push(['weekly','This Sunday']);
+  if(role==='admin'||role==='co_leader')items.push(['mytasks','Tasks']);
+  else if(role==='treasurer'||role==='board_rep'||role==='chairman')items.push(['mytasks','My tasks']);
+  items.push(['epics','Calendar']);
+  if(S.meta.canViewRoster)items.push(['children','Children']);
+  if(S.meta.canViewFinances&&role!=='treasurer')items.push(['finances','Finances']);
+  if(S.meta.canViewMembers)items.push(['members','Members']);
+  return items;
+}
+function render(){
+  var me=S.me;
+  var nav=navFor(me.role).map(function(n){return '<button data-v="'+n[0]+'" class="'+(VIEW===n[0]?'active':'')+'">'+n[1]+'</button>';}).join('');
+  $('#root').innerHTML=
+    '<div class="topbar"><div class="brand"><span class="dot">✝</span> CM Planner</div><div class="spacer"></div>'
+    +'<button class="sm" id="theme" title="Toggle light / dark" style="margin-right:10px">'+(currentTheme()==='dark'?'☀':'🌙')+'</button>'
+    +'<div class="me"><div class="nm">'+esc(me.name)+'</div><div class="chip">'+esc(roleLabel(me.role))+'</div></div>'
+    +'<button class="sm" id="signout" style="margin-left:10px">Sign out</button></div>'
+    +'<div class="nav">'+nav+'</div>'
+    +'<div class="wrap" id="view"></div>';
+  var so=$('#signout'); if(so)so.onclick=signOut;
+  var th=$('#theme'); if(th)th.onclick=toggleTheme;
+  Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){b.onclick=function(){VIEW=b.getAttribute('data-v');EPIC=null;render();};});
+  renderView();
+  mountDorothy();
+}
+function roleLabel(r){return{admin:'Administrator',co_leader:'Co-Leader',teacher:'Teacher',co_teacher:'Co-Teacher',treasurer:'Treasurer',board_rep:'Board Rep',chairman:'Chairman'}[r]||r;}
+
+/* ------------ Ask Dorothy (admin-only assistant) ------------ */
+var DORO={open:false,busy:false,msgs:[]};
+function mountDorothy(){
+  if(!S.me||S.me.role!=='admin'){var ex=document.getElementById('doro');if(ex)ex.remove();return;}
+  if(document.getElementById('doro'))return;
+  var el=document.createElement('div');el.id='doro';document.body.appendChild(el);
+  renderDoro();
+}
+function renderDoro(){
+  var el=document.getElementById('doro');if(!el)return;
+  var html='<button id="doroBtn" class="doro-btn" title="Ask Dorothy">✨ Ask Dorothy</button>';
+  if(DORO.open){
+    var body;
+    if(DORO.msgs.length){
+      body=DORO.msgs.map(function(m,i){
+        var t='<div class="doro-msg '+m.role+'">'+(m.role==='user'?esc(m.text):esc(m.text).replace(/\n/g,'<br>'))+'</div>';
+        if(m.action&&!m._done){
+          var a=m.action,detail='',btn='';
+          if(a.type==='create_task'){
+            detail='➕ <b>'+esc(a.title||'')+'</b>'+(a.owner?' · '+esc(a.owner):'')+(a.due?' · due '+esc(a.due):'')+(a.event?'<br><span class="muted">under '+esc(a.event)+'</span>':'');
+            btn='Create task';
+          } else if(a.type==='update_task'){
+            var c=a.changes||{};var chg=Object.keys(c).filter(function(k){return c[k]!=='';}).map(function(k){return esc(k)+' → <b>'+esc(c[k])+'</b>';}).join(' · ');
+            detail='✏️ '+(a.taskTitle?'<b>'+esc(a.taskTitle)+'</b><br>':'')+'<span class="muted">'+chg+'</span>';
+            btn='Apply change';
+          }
+          if(btn)t+='<div class="doro-action"><div class="small">'+detail+'</div><button class="doro-do" data-i="'+i+'">'+btn+'</button></div>';
+        }
+        if(m._done)t+='<div class="doro-action done small">✅ Added</div>';
+        return t;
+      }).join('');
+    } else {
+      var sugg=['What tasks are overdue?','What\'s coming up next month?','Who\'s unassigned right now?','How much offertory did we collect last year?'];
+      body='<div class="doro-hint">Ask about events, tasks, owners, the calendar, offertory or lessons.<div class="doro-sugg">'
+        +sugg.map(function(q){return '<button class="doro-chip" data-q="'+esc(q)+'">'+esc(q)+'</button>';}).join('')+'</div></div>';
+    }
+    if(DORO.busy)body+='<div class="doro-msg dory doro-typing">Dorothy is thinking…</div>';
+    html+='<div class="doro-panel"><div class="doro-head"><div><b>✨ Ask Dorothy</b><div class="doro-sub">Children\'s Ministry assistant</div></div><button id="doroX" class="doro-x" title="Close">✕</button></div>'
+      +'<div class="doro-body" id="doroBody">'+body+'</div>'
+      +'<div class="doro-input"><textarea id="doroQ" rows="1" placeholder="Ask a question…"'+(DORO.busy?' disabled':'')+'></textarea><button id="doroSend" class="doro-send"'+(DORO.busy?' disabled':'')+'>➤</button></div>'
+      +'<div class="doro-foot">🔒 No child personal information is shared with the assistant.</div></div>';
+  }
+  el.innerHTML=html;
+  var btn=$('#doroBtn');if(btn)btn.onclick=function(){DORO.open=!DORO.open;renderDoro();};
+  var x=$('#doroX');if(x)x.onclick=function(){DORO.open=false;renderDoro();};
+  var send=$('#doroSend');if(send)send.onclick=doroAsk;
+  var q=$('#doroQ');if(q){q.focus();q.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doroAsk();}};}
+  Array.prototype.forEach.call(el.querySelectorAll('.doro-chip'),function(c){c.onclick=function(){var qq=$('#doroQ');if(qq)qq.value=c.getAttribute('data-q');doroAsk();};});
+  Array.prototype.forEach.call(el.querySelectorAll('.doro-do'),function(b){b.onclick=function(){doroDo(+b.getAttribute('data-i'));};});
+  var bd=$('#doroBody');if(bd)bd.scrollTop=bd.scrollHeight;
+}
+function isAffirm(t){return /^(y|yes|yep|yeah|yup|sure|ok|okay|do it|go ahead|confirm|create( it)?|please( do)?|sounds good|yes please)\b/i.test(String(t||'').trim());}
+function doroAsk(){
+  var q=$('#doroQ');if(!q||DORO.busy)return;var text=String(q.value||'').trim();if(!text)return;
+  // If Dorothy just proposed a task and the admin types "yes", treat it as the confirm click.
+  var lastIdx=DORO.msgs.length-1,last=DORO.msgs[lastIdx];
+  if(last&&last.role==='dory'&&last.action&&!last._done&&isAffirm(text)){DORO.msgs.push({role:'user',text:text});renderDoro();doroDo(lastIdx);return;}
+  var hist=DORO.msgs.slice(-6).map(function(m){return {role:m.role,text:m.text};});
+  DORO.msgs.push({role:'user',text:text});DORO.busy=true;renderDoro();
+  api('askDorothy',text,hist).then(function(a){DORO.busy=false;DORO.msgs.push({role:'dory',text:String((a&&a.answer)||'(no answer)'),action:(a&&a.action)||null});renderDoro();})
+    .catch(function(e){DORO.busy=false;DORO.msgs.push({role:'dory',text:'⚠ '+((e&&e.message)==='NOT_ALLOWED'?'Only admins can use Ask Dorothy right now.':((e&&e.message)||'Something went wrong'))});renderDoro();});
+}
+function doroDo(i){
+  var m=DORO.msgs[i];if(!m||!m.action||m._done||DORO.busy)return;
+  DORO.busy=true;renderDoro();
+  api('dorothyAct',m.action).then(function(r){DORO.busy=false;m._done=true;DORO.msgs.push({role:'dory',text:'✅ '+((r&&r.message)||'Done.')});renderDoro();
+    api('getBootstrap').then(function(d){if(d&&d.access){S=d;renderView();}}).catch(function(){});})
+    .catch(function(e){DORO.busy=false;DORO.msgs.push({role:'dory',text:'⚠ '+((e&&e.message)||'Could not create the task')});renderDoro();});
+}
+function renderView(){
+  if(EPIC)return renderEpicDetail();
+  if(VIEW==='dashboard')return renderDashboard();
+  if(VIEW==='mytasks')return renderMyTasksView();
+  if(VIEW==='epics')return renderEpics();
+  if(VIEW==='calendar')return renderCalendar();
+  if(VIEW==='finances')return renderFinances();
+  if(VIEW==='members')return renderMembers();
+  if(VIEW==='children')return renderChildren();
+  if(VIEW==='weekly')return renderWeekly();
+}
+
+/* ------------ offertory rollup (leaders + treasurer) ------------ */
+var OFY=null;
+function renderOffertory(){
+  var v=$('#view');
+  v.innerHTML='<div class="row"><h2>Offertory</h2></div><div id="offBody"><div class="empty">Loading…</div></div>';
+  api('getOffertory',OFY||'').then(renderOffertoryTable).catch(function(e){var b=$('#offBody');if(b)b.innerHTML='<div class="empty">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function renderOffertoryTable(d){
+  OFY=d.year;var classes=d.classes||[];
+  var yearSel=(d.years&&d.years.length)?'<select id="offYear" style="width:auto">'+d.years.map(function(y){return '<option'+(y===d.year?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select>':'<span class="muted small">no data yet</span>';
+  var kpis='<div class="kpis"><div class="kpi"><b>'+money(d.grandTotal||0)+'</b><span class="muted small">'+esc(d.year)+' total</span></div>'
+    +classes.map(function(c){return '<div class="kpi"><b>'+money(d.classTotals[c]||0)+'</b><span class="muted small">'+esc(c)+'</span></div>';}).join('')+'</div>';
+  var table='';
+  if(d.rows&&d.rows.length){
+    var head='<tr><th>Sunday</th>'+classes.map(function(c){return '<th style="text-align:right">'+esc(c)+'</th>';}).join('')+'<th style="text-align:right">Total</th></tr>';
+    var body=d.rows.map(function(r){return '<tr><td class="small">'+esc(r.date)+'</td>'+classes.map(function(c){return '<td style="text-align:right">'+(r.cells[c]?money(r.cells[c]):'<span class="muted">—</span>')+'</td>';}).join('')+'<td style="text-align:right"><b>'+money(r.total)+'</b></td></tr>';}).join('');
+    var foot='<tr><td><b>Year total</b></td>'+classes.map(function(c){return '<td style="text-align:right"><b>'+money(d.classTotals[c]||0)+'</b></td>';}).join('')+'<td style="text-align:right"><b>'+money(d.grandTotal||0)+'</b></td></tr>';
+    table='<table><thead>'+head+'</thead><tbody>'+body+foot+'</tbody></table>';
+  }else{table='<div class="empty">No offertory recorded for '+esc(d.year)+' yet. Enter it per class on the This Sunday page.</div>';}
+  var b=$('#offBody');
+  b.innerHTML='<div class="flex" style="margin-bottom:16px"><label style="margin:0">Financial year (Jan–Dec)</label> '+yearSel+'</div>'+kpis+table;
+  var ys=$('#offYear');if(ys)ys.onchange=function(){OFY=this.value;renderOffertoryInto($('#finBody'));};
+}
+
+/* ------------ weekly class ops (This Sunday) ------------ */
+var WK={date:null,cls:null};
+function recentSunday(){var d=new Date();d.setDate(d.getDate()-d.getDay());var m=String(d.getMonth()+1),day=String(d.getDate());return d.getFullYear()+'-'+(m.length<2?'0'+m:m)+'-'+(day.length<2?'0'+day:day);}
+function renderWeekly(){
+  var v=$('#view');var leader=S.meta.canManageChildren;
+  if(!WK.date)WK.date=recentSunday();
+  var classes=leader?['All Classes'].concat(S.meta.classes||[]):[S.me.class];
+  if(!WK.cls)WK.cls=leader?'All Classes':S.me.class;
+  v.innerHTML='<div class="row"><h2>This Sunday</h2></div>'
+    +'<div class="flex" style="margin-bottom:16px;align-items:flex-end">'
+    +'<div><label>Date</label><input type="date" id="wkDate" value="'+esc(WK.date)+'" style="width:auto"></div>'
+    +(leader?'<div><label>Class</label><select id="wkClass" style="width:auto">'+classes.map(function(c){return '<option'+(c===WK.cls?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select></div>'
+            :'<div><label>Class</label><div><span class="chip">'+esc(WK.cls||'(no class set)')+'</span></div></div>')
+    +'</div><div id="wkBody"><div class="empty">Loading…</div></div>';
+  $('#wkDate').onchange=function(){WK.date=this.value;loadWeekly();};
+  var wc=$('#wkClass');if(wc)wc.onchange=function(){WK.cls=this.value;loadWeekly();};
+  loadWeekly();
+}
+function loadWeekly(){
+  var b=$('#wkBody');if(b)b.innerHTML='<div class="empty">Loading…</div>';
+  if(WK.cls==='All Classes'){
+    api('getWeeklyAll',WK.date).then(renderWeeklyAll).catch(function(e){var x=$('#wkBody');if(x)x.innerHTML='<div class="empty">'+esc((e&&e.message)||'Could not load')+'</div>';});
+    return;
+  }
+  api('getWeekly',WK.date,WK.cls).then(renderWeeklyForm).catch(function(e){var x=$('#wkBody');if(x)x.innerHTML='<div class="empty">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function upcomingToAnnounce(fromDate){
+  var start=parseD(fromDate);if(!start)return [];
+  var end=new Date(start);end.setDate(end.getDate()+42); // ~6 weeks ahead
+  return (S.epics||[]).filter(function(e){if(String(e.archived||'').trim()!=='')return false;var d=parseD(e.event_date);return d&&d>=start&&d<=end;}).sort(function(a,b){return String(a.event_date).localeCompare(String(b.event_date));});
+}
+function announcementHtml(ann,date){
+  var lead=S.meta.canManageEpics;
+  if(!lead)return ''; // Announcements are a leader/admin concern — teachers don't see this section
+  ann=ann||{};var up=upcomingToAnnounce(date);
+  var link=ann.slides_link?'<a href="'+esc(ann.slides_link)+'" target="_blank">Open slides ↗</a>':'<span class="muted">No slides yet</span>';
+  var h='<div class="card" style="margin-bottom:16px">'
+    +'<div class="row" style="margin-bottom:8px"><h3 style="margin:0">Announcements</h3>'+(lead?'<button class="sm" id="annEdit">Edit</button>':'')+'</div>'
+    +'<div class="small">'+link+(ann.notes?' <span class="muted">· '+esc(ann.notes)+'</span>':'')+'</div>';
+  if(up.length)h+='<div class="small muted" style="margin:12px 0 4px">Upcoming to announce (next 6 weeks):</div><ul style="margin:0;padding-left:18px">'
+    +up.map(function(e){var cd=countdown(e.event_date);return '<li class="small" style="margin-bottom:3px"><b>'+esc(e.name)+'</b> — '+esc(e.event_date)+' <span class="'+cd.cls+'">('+cd.txt+')</span>'+(e.notes?' <span class="muted">· '+esc(e.notes)+'</span>':'')+'</li>';}).join('')+'</ul>';
+  return h+'</div>';
+}
+function bindAnnouncement(date,ann){var b=$('#annEdit');if(b)b.onclick=function(){openAnnouncementForm(date,ann);};}
+function openAnnouncementForm(date,ann){
+  ann=ann||{};
+  modal('Announcements — '+esc(date),[
+    {name:'slides_link',label:'Google Slides link',value:ann.slides_link},
+    {name:'notes',label:'Note (optional)',type:'textarea',value:ann.notes}
+  ],function(o){return api('saveAnnouncement',date,o.slides_link,o.notes).then(function(){toast('Saved');loadWeekly();});});
+}
+function renderWeeklyAll(d){
+  var b=$('#wkBody');if(!b)return;
+  var rows=(d&&d.rows)||[];
+  var tp=0,to=0;rows.forEach(function(r){tp+=r.present||0;to+=Number(r.offertory)||0;});
+  b.innerHTML=announcementHtml(d&&d.announcement,WK.date)
+    +'<p class="small muted">Overview for this Sunday — click a class to take attendance or enter offertory.</p>'
+    +'<div class="kpis">'+kpi(tp,'Present total')+kpi(money(to),'Offertory total')+'</div>'
+    +'<table><thead><tr><th>Class</th><th>Present</th><th style="text-align:right">Offertory</th><th>Lesson</th></tr></thead><tbody>'
+    +rows.map(function(r){return '<tr data-c="'+esc(r.class)+'" style="cursor:pointer"><td><b>'+esc(r.class)+'</b></td><td>'+esc(r.present)+' / '+esc(r.roster)+'</td><td style="text-align:right">'+(r.offertory!==''&&r.offertory!=null?money(r.offertory):'<span class="muted">—</span>')+'</td><td class="small muted">'+(r.classOff?'<span class="pill p-Pending">No school</span>':(esc(r.lesson||'')+(r.lessonDone?' <b style="color:var(--good,#1f5a3c)">✓</b>':'')))+'</td></tr>';}).join('')
+    +'</tbody></table>';
+  bindAnnouncement(WK.date,d&&d.announcement);
+  Array.prototype.forEach.call(b.querySelectorAll('tr[data-c]'),function(tr){tr.onclick=function(){WK.cls=tr.getAttribute('data-c');renderWeekly();};});
+}
+function renderWeeklyForm(d){
+  WK.cls=d.class;
+  var present={};(d.present||[]).forEach(function(id){present[String(id)]=true;});
+  var roster=d.roster||[];
+  var rows=roster.length?roster.map(function(c){return '<div class="attrow'+(present[String(c.id)]?' on':'')+'" data-att="'+esc(c.id)+'"><span>'+esc(c.name)+'</span><span class="tgl"></span></div>';}).join('')
+    :'<div class="empty">No children in this class yet.</div>';
+  var team=(d.team||[]);
+  var teamHtml=team.length?'<div class="card" style="margin-bottom:16px"><div class="small muted" style="margin-bottom:7px">Serving this class · '+esc(S.meta.currentSemesterLabel||'')+'</div><div class="flex">'+team.map(function(t){return '<span class="chip">'+esc(t.name)+(t.role?' · '+esc(roleLabel(t.role)):'')+'</span>';}).join('')+(d.substitute?'<span class="chip" style="background:var(--bg-warning,#f4e7c6);color:#8a6412">Sub: '+esc(d.substitute)+'</span>':'')+'</div></div>':'';
+  var b=$('#wkBody');
+  b.innerHTML=announcementHtml(d.announcement,WK.date)+teamHtml+'<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px;align-items:start">'
+    +'<div class="card"><div class="row" style="margin-bottom:12px"><h3 style="margin:0">Attendance <span class="small muted" id="attCount"></span></h3>'
+      +(roster.length?'<div class="flex"><button class="sm" id="allP">All present</button><button class="sm" id="clrP">Clear</button></div>':'')+'</div>'+rows+'</div>'
+    +'<div class="card"><h3>Offertory &amp; lesson</h3>'
+      +'<label>Offertory ($)</label><input type="number" id="wkOff" value="'+esc(d.offertory)+'" placeholder="0">'
+      +lessonBlockHtml(d)
+      +'<label>Substitute today (if someone covered)</label><input type="text" id="wkSub" value="'+esc(d.substitute||'')+'" placeholder="Name">'
+      +'<label>Notes <span class="muted small">(what you\'ll share with parents)</span></label><textarea id="wkNotes">'+esc(d.notes)+'</textarea>'
+      +'<button type="button" class="sm" id="wkCopy" style="margin-top:8px">📋 Copy summary for parents</button>'
+      +'<div style="margin-top:14px"><button class="primary" id="wkSave">Save this Sunday</button></div>'
+    +'</div></div><div id="wkHist" style="margin-top:22px"></div>';
+  bindLessonControls(d);
+  var cpy=$('#wkCopy');if(cpy)cpy.onclick=function(){copyText(parentSummary());toast('Summary copied — paste into the class WhatsApp group');};
+  function upd(){var n=b.querySelectorAll('.attrow.on').length;var el=$('#attCount');if(el)el.textContent='· '+n+' / '+roster.length+' present';}
+  Array.prototype.forEach.call(b.querySelectorAll('.attrow'),function(r){r.onclick=function(){r.classList.toggle('on');upd();};});
+  var ap=$('#allP');if(ap)ap.onclick=function(){Array.prototype.forEach.call(b.querySelectorAll('.attrow'),function(r){r.classList.add('on');});upd();};
+  var cp=$('#clrP');if(cp)cp.onclick=function(){Array.prototype.forEach.call(b.querySelectorAll('.attrow'),function(r){r.classList.remove('on');});upd();};
+  upd();
+  $('#wkSave').onclick=saveWeeklyNow;
+  bindAnnouncement(WK.date,d.announcement);
+  loadWeeklyHistory();
+}
+function lessonLabelJS(n){n=Number(n)||0;return n>0?('Unit '+(Math.floor((n-1)/10)+1)+' · Lesson '+n):'';}
+function lessonBlockHtml(d){
+  if(d.classOff){
+    return '<label>Lesson</label><div class="pill p-Pending" style="display:inline-block;margin:2px 0 6px">No Sunday school this week</div>'
+      +'<div class="small muted" style="margin-bottom:6px">Lesson '+d.lessonNo+' (Unit '+d.unit+') carries to the next Sunday — High School still meets.</div>'
+      +'<input type="hidden" id="wkLessonNo" value="'+esc(d.lessonNo)+'">';
+  }
+  return '<label>Lesson</label>'
+    +'<div class="flex" style="gap:10px;align-items:center;margin-bottom:2px">'
+      +'<button type="button" class="sm" id="lMinus">−</button>'
+      +'<b id="lLabel" style="min-width:160px;text-align:center">'+esc(d.lessonLabel)+'</b>'
+      +'<button type="button" class="sm" id="lPlus">+</button></div>'
+    +'<input type="hidden" id="wkLessonNo" value="'+esc(d.lessonNo)+'">'
+    +'<label style="display:flex;align-items:center;gap:8px;margin-top:4px;font-weight:normal"><input type="checkbox" id="wkDone" style="width:auto"'+(d.lessonDone?' checked':'')+'> Taught / complete <span class="muted small">(advances to the next lesson)</span></label>';
+}
+function bindLessonControls(d){
+  function setLno(n){n=Math.max(1,n);var f=$('#wkLessonNo');if(f)f.value=n;var lab=$('#lLabel');if(lab)lab.textContent=lessonLabelJS(n);}
+  var lm=$('#lMinus'),lp=$('#lPlus');
+  if(lm)lm.onclick=function(){setLno((Number($('#wkLessonNo').value)||0)-1);};
+  if(lp)lp.onclick=function(){setLno((Number($('#wkLessonNo').value)||0)+1);};
+}
+function parentSummary(){
+  var lab=$('#lLabel')?$('#lLabel').textContent:lessonLabelJS($('#wkLessonNo')?$('#wkLessonNo').value:'');
+  var notes=$('#wkNotes')?$('#wkNotes').value.trim():'';
+  var lines=["*Children's Ministry — "+WK.cls+"*", WK.date];
+  if(lab)lines.push('Lesson: '+lab);
+  if(notes)lines.push('',notes);
+  return lines.join('\n');
+}
+function copyText(t){
+  try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t);return;}}catch(e){}
+  var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.select();try{document.execCommand('copy');}catch(_){}ta.remove();
+}
+function saveWeeklyNow(){
+  var ids=[];Array.prototype.forEach.call(document.querySelectorAll('.attrow.on'),function(r){ids.push(r.getAttribute('data-att'));});
+  var btn=$('#wkSave');if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  var lno=$('#wkLessonNo')?$('#wkLessonNo').value:'';
+  var done=$('#wkDone')?$('#wkDone').checked:false;
+  api('saveWeekly',WK.date,WK.cls,ids,$('#wkOff').value,'',$('#wkNotes').value,($('#wkSub')?$('#wkSub').value:''),lno,done)
+    .then(function(){toast('Saved');loadWeekly();})
+    .catch(function(e){if(btn){btn.disabled=false;btn.textContent='Save this Sunday';}apiErr(e);});
+}
+function loadWeeklyHistory(){
+  api('getWeeklyHistory',WK.cls,8).then(function(rows){
+    var el=$('#wkHist');if(!el)return;
+    if(!rows||!rows.length){el.innerHTML='';return;}
+    el.innerHTML='<h3>Recent Sundays</h3><table><thead><tr><th>Date</th><th>Present</th><th>Offertory</th><th>Lesson</th></tr></thead><tbody>'
+      +rows.map(function(r){return '<tr><td class="small">'+esc(r.date)+'</td><td>'+esc(r.present)+'</td><td>'+(r.offertory!==''&&r.offertory!=null?money(r.offertory):'—')+'</td><td class="small muted">'+esc(r.lesson||'')+'</td></tr>';}).join('')
+      +'</tbody></table>';
+  }).catch(function(){});
+}
+
+/* ------------ children (PII, lazy-loaded + role-scoped) ------------ */
+var CHILD_STORE=[];
+function fmtPhone(v){
+  var d=String(v==null?'':v).replace(/\D/g,'');
+  if(d.length===11&&d.charAt(0)==='1')d=d.slice(1);
+  if(d.length===10)return d.slice(0,3)+'-'+d.slice(3,6)+'-'+d.slice(6);
+  return String(v==null?'':v); // leave anything non-standard as typed
+}
+function childSummary(rows){
+  var counts={},unassigned=0;
+  (S.meta.classes||[]).forEach(function(c){counts[c]=0;});
+  rows.forEach(function(c){var cl=String(c.class||'').trim();if(cl===''){unassigned++;}else if(counts[cl]!==undefined){counts[cl]++;}else{counts[cl]=1;}});
+  var tiles=['<div class="kpi"><b>'+rows.length+'</b><span class="muted small">Total</span></div>'];
+  (S.meta.classes||[]).forEach(function(c){tiles.push('<div class="kpi"><b>'+(counts[c]||0)+'</b><span class="muted small">'+esc(c)+'</span></div>');});
+  if(unassigned)tiles.push('<div class="kpi"><b>'+unassigned+'</b><span class="muted small">Unassigned</span></div>');
+  return '<div class="kpis">'+tiles.join('')+'</div>';
+}
+var CHILD_ALL=[],CHILDFILTER='';
+function renderChildren(){
+  var leader=S.meta.canManageChildren; // admin / co-leader see all fields
+  var board=S.meta.isBoardRep;         // read-only roster, no contacts
+  var v=$('#view');
+  var filter=(leader||board)?'<select id="cFilter" style="width:auto"><option value="">All classes</option>'+(S.meta.classes||[]).map(function(c){return '<option'+(c===CHILDFILTER?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select>':'';
+  v.innerHTML='<div class="row"><h2>Children</h2><div class="flex">'+filter+(leader?'<button class="primary" id="newC">+ Add child</button>':'')+'</div></div>'
+    +(leader?'':board?'<p class="small muted">Roster overview for board reporting — no contact details, birthdays, or allergies.</p>':'<p class="small muted">Your class only. Parent contact details are visible to leaders.</p>')
+    +'<div id="childrenBody"><div class="empty">Loading…</div></div>';
+  if(leader){var b=$('#newC');if(b)b.onclick=function(){openChildForm();};}
+  var cf=$('#cFilter');if(cf)cf.onchange=function(){CHILDFILTER=this.value;applyChildFilter();};
+  api('getChildren').then(function(rows){CHILD_ALL=rows||[];applyChildFilter();}).catch(function(e){var b=$('#childrenBody');if(b)b.innerHTML='<div class="empty">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function applyChildFilter(){
+  var rows=CHILDFILTER?CHILD_ALL.filter(function(c){return String(c.class||'')===CHILDFILTER;}):CHILD_ALL;
+  renderChildrenTable(rows,S.meta.canManageChildren);
+}
+function renderChildrenTable(rows,leader){
+  var body=$('#childrenBody');if(!body)return;
+  CHILD_STORE=rows;
+  if(!rows.length){body.innerHTML='<div class="empty">No children yet.'+(leader?' Add one, or bulk-load into the Children tab and run backfillChildIds.':'')+'</div>';return;}
+  var head,trs;
+  if(leader){
+    head='<tr><th>Name</th><th>Class</th><th>Grade</th><th>Age</th><th>Allergies</th><th>Media OK</th><th>Parents</th><th></th></tr>';
+    trs=rows.map(function(c){
+      var p=[];
+      if(c.father_name)p.push(esc(c.father_name)+(c.father_contact?' · '+esc(fmtPhone(c.father_contact)):''));
+      if(c.mother_name)p.push(esc(c.mother_name)+(c.mother_contact?' · '+esc(fmtPhone(c.mother_contact)):''));
+      return '<tr><td>'+esc(c.name)+'</td><td><span class="chip">'+esc(c.class||'—')+'</span></td><td>'+esc(c.grade||'')+'</td><td>'+esc(c.age||'')+'</td>'
+        +'<td class="small">'+(c.allergies?esc(c.allergies):'<span class="muted">none</span>')+'</td>'
+        +'<td class="small">'+esc(c.social_media_permission||'')+'</td>'
+        +'<td class="small muted">'+(p.join('<br>')||'—')+'</td>'
+        +'<td class="small" style="white-space:nowrap"><a data-ec="'+esc(c.id)+'">Edit</a> · <a data-dc="'+esc(c.id)+'" style="color:var(--bad)">✕</a></td></tr>';
+    }).join('');
+  }else if(S.meta.isBoardRep){
+    head='<tr><th>Name</th><th>Class</th><th>Grade</th><th>Age</th></tr>';
+    trs=rows.map(function(c){
+      return '<tr><td>'+esc(c.name)+'</td><td><span class="chip">'+esc(c.class||'—')+'</span></td><td>'+esc(c.grade||'')+'</td><td>'+esc(c.age||'')+'</td></tr>';
+    }).join('');
+  }else{
+    head='<tr><th>Name</th><th>Grade</th><th>Age</th><th>Allergies</th><th>Media OK</th></tr>';
+    trs=rows.map(function(c){
+      return '<tr><td>'+esc(c.name)+'</td><td>'+esc(c.grade||'')+'</td><td>'+esc(c.age||'')+'</td>'
+        +'<td class="small">'+(c.allergies?esc(c.allergies):'<span class="muted">none</span>')+'</td>'
+        +'<td class="small">'+esc(c.social_media_permission||'')+'</td></tr>';
+    }).join('');
+  }
+  body.innerHTML=childSummary(rows)+'<table><thead>'+head+'</thead><tbody>'+trs+'</tbody></table>';
+  if(leader){
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ec]'),function(a){a.onclick=function(){var c=CHILD_STORE.filter(function(x){return String(x.id)===a.getAttribute('data-ec');})[0];openChildForm(c);};});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-dc]'),function(a){a.onclick=function(){var id=a.getAttribute('data-dc');modal('Remove this child record?',[],function(){return api('deleteChild',id).then(function(){toast('Removed');renderChildren();});});};});
+  }
+}
+function openChildForm(c){
+  c=c||{};
+  modal(c.id?'Edit child':'New child',[
+    {name:'name',label:"Child's full name",value:c.name,required:true},
+    {name:'class',label:'Class',type:'select',options:S.meta.classes,value:c.class},
+    {name:'grade',label:'Grade',value:c.grade},
+    {name:'age',label:'Age',value:c.age},
+    {name:'dob',label:'Date of birth',value:c.dob},
+    {name:'father_name',label:"Father's name",value:c.father_name},
+    {name:'father_contact',label:"Father's contact",value:c.father_contact},
+    {name:'father_email',label:"Father's email",value:c.father_email},
+    {name:'mother_name',label:"Mother's name",value:c.mother_name},
+    {name:'mother_contact',label:"Mother's contact",value:c.mother_contact},
+    {name:'mother_email',label:"Mother's email",value:c.mother_email},
+    {name:'language',label:'Language of family',value:c.language},
+    {name:'allergies',label:'Allergies',value:c.allergies},
+    {name:'social_media_permission',label:'Social media permission',value:c.social_media_permission}
+  ],function(o){o.id=c.id;return api('saveChild',o).then(function(){toast('Saved');renderChildren();});});
+}
+
+/* ------------ derived data ------------ */
+function tasksForEpic(id){return S.tasks.filter(function(t){return String(t.epic_id)===String(id);});}
+function epicProgress(id){var ts=tasksForEpic(id);var done=ts.filter(function(t){return t.status==='Completed';}).length;return{done:done,total:ts.length,pct:ts.length?Math.round(done*100/ts.length):0};}
+// Derived completion: has tasks -> all done; no tasks -> complete once its date has passed (a brand-new undated/future no-task event is NOT complete yet).
+function eventComplete(e){var p=epicProgress(e.id);if(p.total>0)return p.done===p.total;var d=parseD(e.event_date);return !!(d&&d<today());}
+function isOverdue(t){return t.status!=='Completed' && (function(){var d=parseD(t.due_date);return d&&d<today();})();}
+function myTasks(){var nm=String(S.me.name||'').toLowerCase();var fn=nm.split(' ')[0];return S.tasks.filter(function(t){var o=String(t.owner||'').toLowerCase();return o===nm||(fn.length>1&&o.indexOf(fn)>=0);});}
+
+/* ------------ dashboards (role specific) ------------ */
+function renderMyTasksView(){
+  var v=$('#view');
+  if(S.me.role==='admin'||S.me.role==='co_leader'){
+    var all=S.tasks.slice();
+    var open=all.filter(function(t){return t.status!=='Completed';});
+    var done=all.filter(function(t){return t.status==='Completed';});
+    var unassigned=open.filter(function(t){return !String(t.owner||'').trim();});
+    var list=(TASKS_SHOW_DONE?all:open); // leaderTaskTable applies the active sort
+    v.innerHTML='<div class="row"><h2>Tasks</h2><div class="flex"><label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showDone" style="width:auto"'+(TASKS_SHOW_DONE?' checked':'')+'> show completed</label><button class="primary" id="newTask">+ New task</button></div></div>'
+      +'<div class="kpis">'+kpi(open.length,'Open')+kpi(open.filter(isOverdue).length,'Overdue',open.filter(isOverdue).length?'var(--bad)':'')+kpi(unassigned.length,'Unassigned',unassigned.length?'var(--warn)':'')+kpi(done.length,'Completed')+'</div>'
+      +(list.length?leaderTaskTable(list):'<div class="empty">'+(TASKS_SHOW_DONE?'No tasks yet.':'Nothing open — all caught up.')+'</div>');
+    $('#showDone').onchange=function(){TASKS_SHOW_DONE=this.checked;renderMyTasksView();};
+    $('#newTask').onclick=function(){openTaskForm(null);};
+    bindTaskRows(true);
+    return;
+  }
+  var mine=myTasks().slice().sort(function(a,b){return (a.due_date||'zzz').localeCompare(b.due_date||'zzz');});
+  var open2=mine.filter(function(t){return t.status!=='Completed';});
+  v.innerHTML='<div class="row"><h2>My tasks</h2></div>'
+    +'<div class="kpis">'+kpi(open2.length,'To do')+kpi(mine.filter(isOverdue).length,'Overdue',mine.filter(isOverdue).length?'var(--bad)':'')+kpi(mine.filter(function(t){return t.status==='Completed';}).length,'Done')+'</div>'
+    +(mine.length?myTaskTable(mine):'<div class="empty">Nothing assigned to you yet.</div>');
+  bindMyTaskRows();
+}
+function renderDashboard(){
+  var r=S.me.role;
+  if(r==='admin'||r==='co_leader')return leaderDash();
+  if(r==='teacher'||r==='co_teacher')return doerDash();
+  if(r==='treasurer')return treasurerDash();
+  if(r==='board_rep'||r==='chairman')return boardDash();
+}
+function leaderDash(){
+  var overdue=S.tasks.filter(isOverdue);
+  var unassigned=S.tasks.filter(function(t){return !String(t.owner).trim();});
+  var v=$('#view');
+  v.innerHTML='<div class="row"><h2>Dashboard</h2><div class="flex"><button class="sm" id="notesBtn">📝 Notes → tasks</button><button class="primary" id="newEpic">+ New event</button></div></div>'
+   +'<div class="kpis">'
+   +kpi(activeEvents().length,'Events')+kpi(S.tasks.length,'Tasks')
+   +kpi(overdue.length,'Overdue',overdue.length?'var(--bad)':'')+kpi(unassigned.length,'Unassigned',unassigned.length?'var(--warn)':'')
+   +'</div>'
+   +'<h3>Events</h3><div class="grid cards" id="epicCards"></div>'
+   +sectionTasks('Overdue',overdue)
+   +sectionTasks('Unassigned',unassigned);
+  $('#newEpic').onclick=function(){openEpicForm();};
+  $('#notesBtn').onclick=function(){openNotesModal();};
+  renderEpicCards($('#epicCards'));
+  bindTaskRows(true);
+}
+function doerDash(){
+  var mine=myTasks().slice().sort(function(a,b){return (a.due_date||'zzz').localeCompare(b.due_date||'zzz');});
+  var open=mine.filter(function(t){return t.status!=='Completed';});
+  var v=$('#view');
+  v.innerHTML='<div class="row"><h2>My tasks</h2></div>'
+   +'<div class="kpis">'+kpi(open.length,'To do')+kpi(mine.filter(isOverdue).length,'Overdue',mine.filter(isOverdue).length?'var(--bad)':'')+kpi(mine.filter(function(t){return t.status==='Completed';}).length,'Done')+'</div>'
+   +(mine.length?myTaskTable(mine):'<div class="empty">No tasks assigned to you yet. A leader will assign them.</div>');
+  bindMyTaskRows();
+}
+function treasurerDash(){renderFinances();}
+var FINMODE='expenses';
+function renderFinances(){
+  var v=$('#view');
+  v.innerHTML='<div class="row"><h2>'+(FINMODE==='offertory'?'Offertory':'Expenses')+'</h2><div class="seg">'
+    +'<button data-fm="expenses" class="'+(FINMODE==='expenses'?'on':'')+'">Expenses</button>'
+    +'<button data-fm="offertory" class="'+(FINMODE==='offertory'?'on':'')+'">Offertory</button>'
+    +'</div></div><div id="finBody"></div>';
+  Array.prototype.forEach.call(v.querySelectorAll('.seg button'),function(b){b.onclick=function(){FINMODE=b.getAttribute('data-fm');renderFinances();};});
+  if(FINMODE==='offertory')renderOffertoryInto($('#finBody'));
+  else renderExpensesInto($('#finBody'));
+}
+function renderOffertoryInto(container){
+  container.innerHTML='<div id="offBody"><div class="empty">Loading…</div></div>';
+  api('getOffertory',OFY||'').then(renderOffertoryTable).catch(function(e){var b=$('#offBody');if(b)b.innerHTML='<div class="empty">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function isReimbursed(b){return /yes|reimbursed/i.test(String(b.reimbursed||''));}
+var EXFY=null;
+function renderExpensesInto(container){
+  var can=S.meta.canManageBudget;
+  var allExp=(S.budget||[]).filter(function(b){return b.category!=='income';});
+  var years={};allExp.forEach(function(b){var m=String(b.date||'').match(/^(\d{4})/);if(m)years[m[1]]=true;});
+  var cy=String(new Date().getFullYear());years[cy]=true;
+  var yearList=Object.keys(years).sort();
+  if(EXFY==null||yearList.indexOf(EXFY)<0)EXFY=(yearList.indexOf(cy)>=0?cy:yearList[yearList.length-1]);
+  var exp=allExp.filter(function(b){return String(b.date||'').slice(0,4)===EXFY;}).slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));});
+  var total=exp.reduce(function(a,b){return a+(Number(b.amount)||0);},0);
+  var reimb=exp.filter(isReimbursed).reduce(function(a,b){return a+(Number(b.amount)||0);},0);
+  var out=total-reimb;
+  container.innerHTML='<div class="row" style="margin-top:4px"><div class="flex"><label class="small muted" style="margin:0">Year (Jan–Dec)</label><select id="exYear" style="width:auto">'+yearList.map(function(y){return '<option'+(y===EXFY?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select></div>'+(can?'<button class="primary" id="newB">+ Add expense</button>':'')+'</div>'
+    +'<div class="kpis" id="exKpis">'+kpi(money(total),'Total expenses')+kpi(money(reimb),'Reimbursed')+kpi(money(out),'Outstanding',out>0?'var(--warn)':'')+'</div>'
+    +expensesTable(exp);
+  var ys=$('#exYear');if(ys)ys.onchange=function(){EXFY=this.value;renderFinances();};
+  if(can){var nb=$('#newB');if(nb)nb.onclick=function(){openExpenseForm();};}
+  bindBudgetRows();bindReimburseToggles();
+}
+function expensesTable(list){
+  if(!list.length)return '<div class="empty">No expenses yet.'+(S.meta.canManageBudget?' Add one — you can attach a receipt.':'')+'</div>';
+  var epById={};S.epics.forEach(function(e){epById[e.id]=e.name;});
+  var can=S.meta.canManageBudget;
+  return '<table><thead><tr><th>Date</th><th>Item</th><th>Event</th><th style="text-align:right">Amount</th><th>Paid by</th><th>Reimbursed</th><th>Receipt</th>'+(can?'<th></th>':'')+'</tr></thead><tbody>'
+    +list.map(function(b){
+      var yes=isReimbursed(b);
+      var rc=b.receipt_url?'<a href="'+esc(b.receipt_url)+'" target="_blank">view</a>':'<span class="muted">—</span>';
+      var rb=can?'<span data-rb="'+esc(b.id)+'" class="tgl'+(yes?' on':'')+'" style="cursor:pointer" title="Toggle reimbursed"></span>'
+              :'<span class="pill '+(yes?'p-Completed':'p-Pending')+'">'+(yes?'Yes':'No')+'</span>';
+      return '<tr><td class="small nowrap">'+esc(b.date||'—')+'</td><td>'+esc(b.item)+'</td><td class="small muted">'+esc(epById[b.epic_id]||'—')+'</td>'
+        +'<td style="text-align:right">'+money(b.amount)+'</td><td class="small">'+esc(b.paid_by||'')+'</td><td>'+rb+'</td><td class="small">'+rc+'</td>'
+        +(can?'<td class="small" style="white-space:nowrap"><a data-be="'+esc(b.id)+'">Edit</a> · <a data-bd="'+esc(b.id)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';
+    }).join('')+'</tbody></table>';
+}
+function updateExpenseKpis(){
+  var el=$('#exKpis');if(!el)return;
+  var exp=(S.budget||[]).filter(function(b){return b.category!=='income'&&String(b.date||'').slice(0,4)===EXFY;});
+  var total=exp.reduce(function(a,b){return a+(Number(b.amount)||0);},0);
+  var reimb=exp.filter(isReimbursed).reduce(function(a,b){return a+(Number(b.amount)||0);},0);var out=total-reimb;
+  el.innerHTML=kpi(money(total),'Total expenses')+kpi(money(reimb),'Reimbursed')+kpi(money(out),'Outstanding',out>0?'var(--warn)':'');
+}
+function bindReimburseToggles(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-rb]'),function(a){a.onclick=function(){
+    var id=a.getAttribute('data-rb');var b=(S.budget||[]).filter(function(x){return String(x.id)===id;})[0];if(!b)return;
+    var next=isReimbursed(b)?'No':'Yes';
+    a.classList.toggle('on',next==='Yes');b.reimbursed=next;updateExpenseKpis(); // instant, no reload
+    api('saveBudget',{id:id,reimbursed:next}).catch(function(e){a.classList.toggle('on',next!=='Yes');b.reimbursed=(next==='Yes'?'No':'Yes');updateExpenseKpis();apiErr(e);});
+  };});
+}
+function openExpenseForm(b){
+  b=b||{};
+  var epicOpts=['(none)'].concat(S.epics.map(function(e){return e.name;}));
+  var curEp=b.epic_id?((S.epics.filter(function(e){return String(e.id)===String(b.epic_id);})[0]||{}).name||'(none)'):'(none)';
+  var bd=document.createElement('div');bd.className='backdrop';
+  bd.innerHTML='<div class="modal"><h3>'+(b.id?'Edit expense':'Add expense')+'</h3>'
+    +'<label>Item / description</label><input id="eItem" value="'+esc(b.item||'')+'">'
+    +'<label>Date</label><input type="date" id="eDate" value="'+esc(b.date||'')+'">'
+    +'<label>Amount ($)</label><input type="number" id="eAmt" value="'+esc(b.amount||'')+'">'
+    +'<label>Type</label><select id="eCat"><option value="expense"'+(b.category!=='income'?' selected':'')+'>expense</option><option value="income"'+(b.category==='income'?' selected':'')+'>income</option></select>'
+    +'<label>Event (optional)</label><select id="eEpic">'+epicOpts.map(function(n){return '<option'+(n===curEp?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select>'
+    +'<label>Paid by</label><input id="ePaid" value="'+esc(b.paid_by||'')+'" placeholder="who fronted the money">'
+    +'<label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="eReimb" style="width:auto"'+(isReimbursed(b)?' checked':'')+'> Reimbursed</label>'
+    +'<label>Receipt'+(b.receipt_url?' — <a href="'+esc(b.receipt_url)+'" target="_blank">current</a>':'')+'</label><input type="file" id="eRcpt" accept="image/*,application/pdf">'
+    +'<label>Notes</label><textarea id="eNotes">'+esc(b.notes||'')+'</textarea>'
+    +'<div class="actions"><button id="eCancel">Cancel</button><button class="primary" id="eSave">Save</button></div></div>';
+  document.body.appendChild(bd);
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#eCancel',bd).onclick=function(){bd.remove();};
+  $('#eSave',bd).onclick=function(){
+    var item=$('#eItem',bd).value.trim();if(!item){$('#eItem',bd).style.borderColor='var(--bad)';return;}
+    var btn=$('#eSave',bd);btn.disabled=true;btn.textContent='Saving…';
+    var ep=S.epics.filter(function(e){return e.name===$('#eEpic',bd).value;})[0];
+    var payload={id:b.id,item:item,date:$('#eDate',bd).value,amount:$('#eAmt',bd).value,category:$('#eCat',bd).value,epic_id:ep?ep.id:'',paid_by:$('#ePaid',bd).value,reimbursed:$('#eReimb',bd).checked?'Yes':'No',notes:$('#eNotes',bd).value};
+    function finish(){reloadAfter(api('saveBudget',payload),'Saved').then(function(){bd.remove();}).catch(function(e){btn.disabled=false;btn.textContent='Save';apiErr(e);});}
+    var file=$('#eRcpt',bd).files[0];
+    if(file){
+      btn.textContent='Uploading…';
+      var reader=new FileReader();
+      reader.onload=function(){api('saveReceipt',reader.result,file.name).then(function(r){payload.receipt_url=r.url||'';finish();}).catch(function(e){btn.disabled=false;btn.textContent='Save';apiErr(e);});};
+      reader.onerror=function(){btn.disabled=false;btn.textContent='Save';toast('Could not read file');};
+      reader.readAsDataURL(file);
+    }else finish();
+  };
+}
+function boardDash(){
+  var v=$('#view');
+  v.innerHTML='<div class="row"><h2>Overview</h2></div><div class="grid cards" id="epicCards"></div>';
+  renderEpicCards($('#epicCards'),true);
+}
+function kpi(val,label,color){return '<div class="kpi"><b style="color:'+(color||'inherit')+'">'+val+'</b><span class="muted small">'+label+'</span></div>';}
+function sectionTasks(title,list){
+  if(!list.length)return '';
+  return '<h3 style="margin-top:18px">'+title+' ('+list.length+')</h3>'+leaderTaskTable(list);
+}
+
+/* ------------ epic cards + lists ------------ */
+function activeEvents(){return S.epics.filter(function(e){return String(e.archived||'').trim()==='';});}
+function eventCard(e){
+  var p=epicProgress(e.id);var cd=countdown(e.event_date);
+  var arch=String(e.archived||'').trim()!=='';var done=eventComplete(e);
+  var badge=arch?'archived':(done?'✓ Complete':cd.txt);var bcls=arch?'':(done?'cd-done':cd.cls);
+  return '<div class="card click" data-e="'+esc(e.id)+'"'+(arch?' style="opacity:.55"':'')+'>'
+    +'<div class="flex" style="justify-content:space-between"><span class="chip">'+esc(e.program||'—')+'</span><span class="small '+bcls+'">'+badge+'</span></div>'
+    +'<h3 style="margin:8px 0 4px">'+esc(e.name)+'</h3>'
+    +'<div class="small muted">'+esc(e.event_date||'no date')+' · '+esc(e.status||'')+'</div>'
+    +'<div class="bar" style="margin-top:10px"><i style="width:'+p.pct+'%"></i></div>'
+    +'<div class="small muted" style="margin-top:4px">'+p.done+'/'+p.total+' tasks done</div>'
+    +'</div>';
+}
+function renderEpicCards(container,readonly){
+  var list=activeEvents();
+  if(!list.length){container.className='';container.innerHTML='<div class="empty">No events yet.</div>';return;}
+  container.className='';
+  function pad(n){return (n<10?'0':'')+n;}
+  var d=new Date();var today=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  var MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  function ym(s){var m=String(s).match(/^(\d{4})-(\d{2})/);return m?m[1]+'-'+m[2]:'';}
+  function ymLabel(k){var p=k.split('-');return MON[(+p[1])-1]+' '+p[0];}
+  var dated=list.filter(function(e){return e.event_date;});
+  var undated=list.filter(function(e){return !e.event_date;});
+  var up=dated.filter(function(e){return e.event_date>=today;}).sort(function(a,b){return a.event_date.localeCompare(b.event_date);});
+  var past=dated.filter(function(e){return e.event_date<today;}).sort(function(a,b){return b.event_date.localeCompare(a.event_date);});
+  function grp(evs){var g={},order=[];evs.forEach(function(e){var k=ym(e.event_date);if(!g[k]){g[k]=[];order.push(k);}g[k].push(e);});return {g:g,order:order};}
+  var html='',U=grp(up);
+  U.order.forEach(function(k){html+='<h3 style="margin:16px 0 10px">'+esc(ymLabel(k))+'</h3><div class="grid cards">'+U.g[k].map(eventCard).join('')+'</div>';});
+  if(undated.length)html+='<h3 style="margin:18px 0 10px">No date yet</h3><div class="grid cards">'+undated.map(eventCard).join('')+'</div>';
+  if(past.length){html+='<h3 style="margin:22px 0 10px;color:var(--muted)">Earlier</h3>';var P=grp(past);
+    P.order.forEach(function(k){html+='<div class="small muted" style="margin:12px 0 6px">'+esc(ymLabel(k))+'</div><div class="grid cards" style="opacity:.65">'+P.g[k].map(eventCard).join('')+'</div>';});}
+  container.innerHTML=html;
+  Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+}
+var SHOW_ARCHIVED=false;
+var CALYEAR=null;
+function ayOf(dstr){var m=String(dstr).match(/^(\d{4})-(\d{2})/);if(!m)return null;var y=+m[1],mo=+m[2];return mo>=7?y:y-1;}
+function ayLabel(y){return y+'–'+String(y+1).slice(2);} // 2026–27
+var CALMODE='calendar';
+var TASKS_SHOW_DONE=false;
+function renderEpics(){
+  var v=$('#view');var lead=S.meta.canManageEpics;
+  var ays={};activeEvents().forEach(function(e){if(e.event_date){var a=ayOf(e.event_date);if(a!=null)ays[a]=true;}});
+  var now=new Date();var curAy=(now.getMonth()>=6)?now.getFullYear():now.getFullYear()-1;ays[curAy]=true;
+  var ayList=Object.keys(ays).map(Number).sort(function(a,b){return a-b;});
+  if(CALYEAR==null||ayList.indexOf(CALYEAR)<0)CALYEAR=(ayList.indexOf(curAy)>=0?curAy:ayList[0]);
+  var seg='<div class="seg"><button data-cm="calendar" class="'+(CALMODE==='calendar'?'on':'')+'">Calendar</button><button data-cm="events" class="'+(CALMODE==='events'?'on':'')+'">Events</button></div>';
+  v.innerHTML='<div class="row"><h2>'+(CALMODE==='events'?'Events':'Calendar of events')+'</h2><div class="flex">'
+    +seg
+    +'<select id="ayPick" style="width:auto">'+ayList.map(function(y){return '<option value="'+y+'"'+(y===CALYEAR?' selected':'')+'>'+ayLabel(y)+'</option>';}).join('')+'</select>'
+    +'<label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showArch" style="width:auto"'+(SHOW_ARCHIVED?' checked':'')+'> show archived</label>'
+    +(lead?'<button class="sm" id="tidyE">Tidy completed</button><button class="primary" id="newEpic">+ New event</button>':'')
+    +'</div></div><div id="progBody"></div>';
+  if(lead)$('#newEpic').onclick=function(){openEpicForm();};
+  if(lead)$('#tidyE').onclick=function(){confirmDo('Archive every completed event (all tasks done, or no tasks and the date has passed)?',function(){return api('tidyCompleted');},'Tidied');};
+  var sa=$('#showArch');if(sa)sa.onchange=function(){SHOW_ARCHIVED=this.checked;renderEpics();};
+  var ap=$('#ayPick');if(ap)ap.onchange=function(){CALYEAR=+this.value;renderEpics();};
+  Array.prototype.forEach.call(v.querySelectorAll('.seg button'),function(b){b.onclick=function(){CALMODE=b.getAttribute('data-cm');renderEpics();};});
+  if(CALMODE==='events'){renderEventsByProgram($('#progBody'));return;}
+  // A late-arriving birthday fetch must not repaint the calendar if the user has since
+  // switched to Events (or left the view entirely) — guard on current mode + panel.
+  function paintCal(){var pb=$('#progBody');if(pb&&CALMODE==='calendar'&&!EPIC)renderEventsByDate(pb);}
+  if(S.meta.canViewChildren && BDAY_AY!==CALYEAR){
+    api('getBirthdays',CALYEAR).then(function(b){BIRTHDAYS=b||[];BDAY_AY=CALYEAR;paintCal();})
+      .catch(function(){BIRTHDAYS=[];BDAY_AY=CALYEAR;paintCal();});
+  } else { renderEventsByDate($('#progBody')); }
+}
+var BIRTHDAYS=[],BDAY_AY=null;
+function renderEventsByDate(container){
+  function pad(n){return (n<10?'0':'')+n;}
+  function parse(s){var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;}
+  function key(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+  var DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var start=new Date(CALYEAR,6,1),end=new Date(CALYEAR+1,5,30); // July of CALYEAR .. June next
+  var evAll=SHOW_ARCHIVED?S.epics.slice():activeEvents();
+  var dated=evAll.filter(function(e){var d=e.event_date?parse(e.event_date):null;return d&&d>=start&&d<=end;});
+  var undated=evAll.filter(function(e){return !e.event_date;});
+  // "Sunday School" events are the per-Sunday task buckets — don't render them as
+  // separate rows; instead they hang off that Sunday's own line (with a task count).
+  // Sunday School buckets are managed from the Tasks tab, not shown per-Sunday on the calendar.
+  dated=dated.filter(function(e){return String(e.name||'').trim().toLowerCase()!=='sunday school';});
+  var evByDate={};dated.forEach(function(e){(evByDate[e.event_date]=evByDate[e.event_date]||[]).push(e);});
+  var dateSet={};
+  var sun=new Date(start);while(sun.getDay()!==0)sun.setDate(sun.getDate()+1);
+  for(var s=new Date(sun);s<=end;s.setDate(s.getDate()+7))dateSet[key(s)]=true;
+  Object.keys(evByDate).forEach(function(k){dateSet[k]=true;});
+  var bday={};(BIRTHDAYS||[]).forEach(function(bb){if(!bb.date)return;(bday[bb.date]=bday[bb.date]||[]).push(bb);});
+  Object.keys(bday).forEach(function(bk){dateSet[bk]=true;}); // birthdays get their own dated rows
+  var leaderV=S.meta.canManageChildren;
+  var keys=Object.keys(dateSet).sort();
+  var html='',curMo='';
+  keys.forEach(function(k){
+    var dt=parse(k);if(!dt)return;var mo=k.slice(0,7);
+    if(mo!==curMo){if(curMo)html+='</tbody></table>';curMo=mo;html+='<h3 style="margin:16px 0 8px">'+MON[dt.getMonth()]+' '+dt.getFullYear()+'</h3><table><tbody>';}
+    var evs=evByDate[k]||[];
+    var isSun=dt.getDay()===0;
+    var noSS=evs.some(function(e){return String(e.no_school||'')==='yes' || /no\s+(sunday school|child)/i.test(String(e.notes||''));});
+    var label=DOW[dt.getDay()]+' '+MON[dt.getMonth()].slice(0,3)+' '+dt.getDate();
+    var cells=[];
+    if(isSun)cells.push(noSS
+      ?{html:'<span class="pill p-Pending">No Sunday school</span>',id:null}
+      :{html:'<span class="muted">Regular Sunday school class</span>',id:null});
+    evs.forEach(function(e){cells.push({html:'<span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':''),id:e.id});});
+    if(bday[k]&&bday[k].length){var bn=bday[k].map(function(bb){return esc(bb.name)+(leaderV&&bb.class?' <span class="muted">('+esc(bb.class)+')</span>':'');}).join(', ');cells.push({html:'<span style="color:var(--gold)">🎂 '+(bday[k].length>1?'Birthdays':'Birthday')+': '+bn+'</span>',id:null});}
+    if(!cells.length)return;
+    cells.forEach(function(c,i){
+      var at=c.id?' data-e="'+esc(c.id)+'" style="cursor:pointer"':(c.sun?' data-sun="'+esc(c.sun)+'" style="cursor:pointer"':'');
+      html+='<tr'+at+'><td class="small" style="width:118px;white-space:nowrap;color:var(--muted);vertical-align:top">'+(i===0?label:'')+'</td><td>'+c.html+'</td></tr>';
+    });
+  });
+  if(curMo)html+='</tbody></table>';
+  if(!html)html='<div class="empty">No events scheduled.</div>';
+  container.innerHTML=html;
+  Array.prototype.forEach.call(container.querySelectorAll('tr[data-e]'),function(tr){tr.onclick=function(){EPIC=tr.getAttribute('data-e');render();};});
+  Array.prototype.forEach.call(container.querySelectorAll('tr[data-sun]'),function(tr){tr.onclick=function(){openSundaySchoolFor(tr.getAttribute('data-sun'));};});
+  Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+}
+function openSundaySchoolFor(date){
+  api('openSundaySchool',date).then(function(id){
+    if(!id){toast('No Sunday School tasks for that week yet');return;}
+    api('getBootstrap').then(function(d){S=d;EPIC=id;render();}).catch(fatal);
+  }).catch(apiErr);
+}
+function openNotesModal(){
+  var bd=document.createElement('div');bd.className='backdrop';
+  bd.innerHTML='<div class="modal" style="max-width:620px"><h3>📝 Meeting notes → tasks</h3>'
+    +'<p class="small muted">Paste your Zoom AI meeting notes. The AI pulls out action items and routes each to the right event.</p>'
+    +'<textarea id="mnText" style="min-height:200px" placeholder="Paste meeting notes here…"></textarea>'
+    +'<div class="actions"><button id="mnCancel">Cancel</button><button class="primary" id="mnGo">✨ Extract tasks</button></div></div>';
+  document.body.appendChild(bd);
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#mnCancel',bd).onclick=function(){bd.remove();};
+  $('#mnGo',bd).onclick=function(){
+    var notes=$('#mnText',bd).value.trim();if(!notes){$('#mnText',bd).style.borderColor='var(--bad)';return;}
+    var b=$('#mnGo',bd);b.disabled=true;b.textContent='✨ Thinking…';
+    api('extractTasksFromNotes',notes).then(function(res){bd.remove();openMeetingReview((res&&res.tasks)||[]);}).catch(function(e){b.disabled=false;b.textContent='✨ Extract tasks';apiErr(e);});
+  };
+}
+function openMeetingReview(tasks){
+  if(!tasks.length){toast('No action items found in those notes');return;}
+  var evOpts=['General'].concat(S.epics.map(function(e){return e.name;}));
+  var bd=document.createElement('div');bd.className='backdrop';
+  bd.innerHTML='<div class="modal" style="max-width:680px"><h3>Review extracted tasks</h3>'
+    +'<p class="small muted">Untick any you don\'t want; fix the event routing if needed, then add.</p>'
+    +'<div style="max-height:54vh;overflow:auto">'+tasks.map(function(t,i){
+      return '<div style="padding:9px 0;border-bottom:1px solid var(--line)">'
+        +'<label style="display:flex;gap:9px;cursor:pointer"><input type="checkbox" data-mt="'+i+'" checked style="width:auto;margin-top:3px"><span style="flex:1"><b>'+esc(t.title||'')+'</b>'+(t.owner?' <span class="chip">'+esc(t.owner)+'</span>':'')+(t.due_offset?' <span class="small muted">'+esc(t.due_offset)+'</span>':'')+(t.notes?'<br><span class="small muted">'+esc(t.notes)+'</span>':'')+'</span></label>'
+        +'<div class="small muted" style="margin:5px 0 0 27px">Event: <select data-mev="'+i+'" style="width:auto;font-size:12px;padding:3px 7px">'+evOpts.map(function(n){return '<option'+(n===(t.event||'General')?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select></div>'
+        +'</div>';
+    }).join('')+'</div>'
+    +'<div class="actions"><button id="mrCancel">Cancel</button><button class="primary" id="mrAdd">Add selected</button></div></div>';
+  document.body.appendChild(bd);
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#mrCancel',bd).onclick=function(){bd.remove();};
+  $('#mrAdd',bd).onclick=function(){
+    var picked=[];Array.prototype.forEach.call(bd.querySelectorAll('[data-mt]:checked'),function(cb){var i=+cb.getAttribute('data-mt');var t=tasks[i];var sel=bd.querySelector('[data-mev="'+i+'"]');t.event=sel?sel.value:(t.event||'General');picked.push(t);});
+    if(!picked.length){bd.remove();return;}
+    var b=$('#mrAdd',bd);b.disabled=true;b.textContent='Adding…';
+    reloadAfter(api('addRoutedTasks',picked),'Added '+picked.length+' task'+(picked.length>1?'s':'')).then(function(){bd.remove();}).catch(function(e){b.disabled=false;b.textContent='Add selected';apiErr(e);});
+  };
+}
+function suggestTasksFor(epicId,btn){
+  if(btn){btn.disabled=true;btn.textContent='✨ Thinking…';}
+  api('suggestTasks',epicId).then(function(res){
+    if(btn){btn.disabled=false;btn.textContent='✨ Suggest tasks';}
+    openSuggestModal(epicId,(res&&res.tasks)||[]);
+  }).catch(function(e){if(btn){btn.disabled=false;btn.textContent='✨ Suggest tasks';}apiErr(e);});
+}
+function openSuggestModal(epicId,tasks){
+  if(!tasks.length){toast('No suggestions came back');return;}
+  var bd=document.createElement('div');bd.className='backdrop';
+  bd.innerHTML='<div class="modal" style="max-width:600px"><h3>✨ AI-suggested tasks</h3>'
+    +'<p class="small muted">Based on your past similar events. Untick any you don\'t want, then add.</p>'
+    +'<div style="max-height:52vh;overflow:auto">'+tasks.map(function(t,i){return '<label style="display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);cursor:pointer"><input type="checkbox" data-sg="'+i+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(t.title||'')+'</b>'+(t.owner?' <span class="chip">'+esc(t.owner)+'</span>':'')+(t.due_offset?' <span class="small muted">'+esc(t.due_offset)+'</span>':'')+(t.notes?'<br><span class="small muted">'+esc(t.notes)+'</span>':'')+'</span></label>';}).join('')+'</div>'
+    +'<div class="actions"><button id="sgCancel">Cancel</button><button class="primary" id="sgAdd">Add selected</button></div></div>';
+  document.body.appendChild(bd);
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#sgCancel',bd).onclick=function(){bd.remove();};
+  $('#sgAdd',bd).onclick=function(){
+    var picked=[];Array.prototype.forEach.call(bd.querySelectorAll('[data-sg]:checked'),function(cb){picked.push(tasks[+cb.getAttribute('data-sg')]);});
+    if(!picked.length){bd.remove();return;}
+    var b=$('#sgAdd',bd);b.disabled=true;b.textContent='Adding…';
+    reloadAfter(api('addSuggestedTasks',epicId,picked),'Added '+picked.length+' task'+(picked.length>1?'s':'')).then(function(){bd.remove();}).catch(function(e){b.disabled=false;b.textContent='Add selected';apiErr(e);});
+  };
+}
+function renderEventsByProgram(container){
+  var progs=S.meta.programs||[];var byProg={};progs.forEach(function(p){byProg[p]=[];});var other=[];
+  S.epics.forEach(function(e){
+    if(!SHOW_ARCHIVED&&String(e.archived||'').trim()!=='')return;
+    if(e.event_date){var a=ayOf(e.event_date);if(a!==CALYEAR)return;} // dated events: only the selected year (undated buckets always show)
+    var pr=String(e.program||'').trim();
+    if(byProg[pr])byProg[pr].push(e);else other.push(e);
+  });
+  var html='';
+  progs.forEach(function(p){html+=programSection(p,byProg[p]);});
+  if(other.length)html+=programSection('Not assigned to a program',other);
+  container.innerHTML=html||'<div class="empty">No events yet.</div>';
+  Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+}
+function programSection(name,list){
+  if(!list.length)return '';
+  var cards=list.slice().sort(function(a,b){return (a.event_date||'').localeCompare(b.event_date||'');}).map(eventCard).join('');
+  return '<details class="prog" open><summary>'+esc(name)+' <span class="muted small" style="font-weight:400">('+list.length+')</span></summary><div class="grid cards" style="margin:6px 0 14px">'+cards+'</div></details>';
+}
+
+/* ------------ epic detail ------------ */
+function renderEpicDetail(){
+  var e=S.epics.filter(function(x){return String(x.id)===String(EPIC);})[0];
+  if(!e){EPIC=null;return render();}
+  var ts=sortTasks(tasksForEpic(e.id));
+  var p=epicProgress(e.id);var cd=countdown(e.event_date);var done=eventComplete(e);
+  var chip=String(e.archived||'').trim()?'<span class="cd-done">✓ archived</span>':(done?'<span class="cd-done">✓ Complete</span>':'<span class="'+cd.cls+'">'+cd.txt+'</span>');
+  var lead=S.meta.canManageEpics;
+  var v=$('#view');
+  v.innerHTML='<div class="row"><div><a id="back">← Back</a><h2 style="margin-top:6px">'+esc(e.name)+'</h2>'
+    +'<div class="small muted">'+(e.program?esc(e.program)+' · ':'')+esc(e.event_date||'no date')+' · '+esc(e.status||'')+' · '+chip+(e.no_school==='yes'?' · <span class="pill p-Pending">No Sunday school</span>':'')+'</div></div>'
+    +'<div class="flex">'
+    +(lead?'<button id="editE" class="sm">Edit</button><button id="cloneE" class="sm">Clone</button><button id="archE" class="sm">'+(String(e.archived||'').trim()?'Unarchive':'Archive')+'</button><button id="delE" class="sm danger">Delete</button>':'')
+    +(lead&&String(e.name||'').trim().toLowerCase()==='sunday school'?'<button id="noSch" class="sm">'+(String(e.status||'').toLowerCase()==='no school'?'Mark: class is on':'Mark: no class this week')+'</button>':'')
+    +'</div></div>'
+    +'<div class="bar"><i style="width:'+p.pct+'%"></i></div><div class="small muted" style="margin:4px 0 16px">'+p.done+'/'+p.total+' done</div>'
+    +'<div class="row"><h3>Tasks</h3><div class="flex">'+(lead?'<button class="sm" id="aiT">✨ Suggest tasks</button><button class="sm primary" id="newT">+ Add task</button>':'')+'</div></div>'
+    +(ts.length?taskTable(ts,lead):'<div class="empty">No tasks yet.</div>')
+    +renderFeedbackSection(e,lead);
+  $('#back').onclick=function(){EPIC=null;render();};
+  if(lead){
+    $('#editE').onclick=function(){openEpicForm(e);};
+    $('#cloneE').onclick=function(){openCloneForm(e);};
+    $('#delE').onclick=function(){confirmDo('Delete event "'+e.name+'" and all its tasks?',function(){return api('deleteEpic',e.id);},'Event deleted',function(){EPIC=null;});};
+    $('#archE').onclick=function(){var toArch=!String(e.archived||'').trim();confirmDo((toArch?'Archive':'Unarchive')+' "'+e.name+'"?',function(){return api('setEventArchived',e.id,toArch);},toArch?'Archived':'Unarchived',function(){EPIC=null;});};
+    $('#newT').onclick=function(){openTaskForm(e.id);};
+    var ns=$('#noSch');if(ns)ns.onclick=function(){var on=String(e.status||'').toLowerCase()!=='no school';confirmDo(on?'Mark this Sunday as NO Sunday School?':'Mark class back on for this Sunday?',function(){return api('setSundayNoSchool',e.id,on);},'Updated');};
+    var ai=$('#aiT');if(ai)ai.onclick=function(){suggestTasksFor(e.id,ai);};
+  }
+  bindTaskRows(lead);
+  bindFeedback(e,lead);
+}
+
+/* ------------ task tables ------------ */
+var TASKSORT={key:'due',dir:1};
+function sortTasks(ts){
+  var k=TASKSORT.key,dir=TASKSORT.dir,order=S.meta.taskStatus||[];
+  function val(t){
+    if(k==='owner')return String(t.owner||'~~~').toLowerCase();      // unassigned sorts last
+    if(k==='event')return String(t.epic_name||'~~~').toLowerCase();
+    if(k==='due')return t.due_date||'9999-99-99';                    // no date sorts last
+    if(k==='priority')return ['High','Medium','Low'].indexOf(t.priority||'Medium');
+    if(k==='status'){var i=order.indexOf(t.status||'Pending');return i<0?99:i;}
+    return String(t.title||'').toLowerCase();
+  }
+  return ts.slice().sort(function(a,b){var x=val(a),y=val(b);return x<y?-dir:x>y?dir:0;});
+}
+function sortTh(key,label){var on=TASKSORT.key===key;return '<th class="sortth" data-sort="'+key+'" style="cursor:pointer;user-select:none" title="Sort by '+label+'">'+label+(on?(TASKSORT.dir>0?' ▲':' ▼'):'')+'</th>';}
+function taskTable(ts,lead){
+  return '<table><thead><tr>'+sortTh('title','Task')+sortTh('owner','Owner')+sortTh('due','Due')+'<th>When</th>'+sortTh('priority','Priority')+sortTh('status','Status')+'<th></th></tr></thead><tbody>'
+    +ts.map(function(t){
+      var ov=isOverdue(t);var cd=countdown(t.due_date);
+      var canDoer=(S.me.role==='teacher'||S.me.role==='co_teacher')&&String(t.owner)===String(S.me.name);
+      var statusCell=(lead||canDoer)
+        ? '<select data-status="'+esc(t.id)+'">'+S.meta.taskStatus.map(function(s){return '<option '+(s===t.status?'selected':'')+'>'+s+'</option>';}).join('')+'</select>'
+        : '<span class="pill '+(ov?'p-over':statusClass(t.status))+'">'+esc(t.status||'Pending')+'</span>';
+      return '<tr><td>'+esc(t.title)+'</td><td>'+(t.owner?esc(t.owner):'<span class="muted">unassigned</span>')+'</td>'
+        +'<td class="small">'+esc(t.due_date||'—')+'</td><td class="small '+cd.cls+'">'+cd.txt+'</td>'
+        +'<td class="small">'+esc(t.priority||'')+'</td><td>'+statusCell+'</td>'
+        +'<td class="small">'+(lead?'<a data-edit="'+esc(t.id)+'">Edit</a> · <a data-del="'+esc(t.id)+'" class="danger" style="color:var(--bad)">✕</a>':'')+'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+function leaderTaskTable(ts){
+  ts=sortTasks(ts);
+  return '<table><thead><tr>'+sortTh('title','Task')+sortTh('event','Event')+sortTh('owner','Owner')+sortTh('due','Due')+sortTh('status','Status')+'<th></th></tr></thead><tbody>'
+    +ts.map(function(t){var cd=countdown(t.due_date);
+      return '<tr><td>'+esc(t.title)+'</td><td class="small muted">'+esc(t.epic_name||'')+'</td><td>'+(t.owner?esc(t.owner):'<span class="muted">unassigned</span>')+'</td>'
+        +'<td class="small '+cd.cls+'">'+esc(t.due_date||'—')+' ('+cd.txt+')</td>'
+        +'<td><select data-status="'+esc(t.id)+'">'+S.meta.taskStatus.map(function(s){return '<option '+(s===t.status?'selected':'')+'>'+s+'</option>';}).join('')+'</select></td>'
+        +'<td class="small nowrap"><a data-edit="'+esc(t.id)+'">Edit</a> · <a data-del="'+esc(t.id)+'" style="color:var(--bad)">✕</a></td></tr>';
+    }).join('')
+    +'</tbody></table>';
+}
+function myTaskTable(ts){
+  return '<table><thead><tr><th>Task</th><th>Event</th><th>Due</th><th>When</th><th>Status</th></tr></thead><tbody>'
+    +ts.map(function(t){var cd=countdown(t.due_date);return '<tr><td>'+esc(t.title)+'</td><td class="small muted">'+esc(t.epic_name||'')+'</td><td class="small">'+esc(t.due_date||'—')+'</td><td class="small '+cd.cls+'">'+cd.txt+'</td>'
+      +'<td><select data-status="'+esc(t.id)+'">'+S.meta.taskStatus.map(function(s){return '<option '+(s===t.status?'selected':'')+'>'+s+'</option>';}).join('')+'</select></td></tr>';}).join('')
+    +'</tbody></table>';
+}
+function bindTaskRows(lead){
+  Array.prototype.forEach.call(document.querySelectorAll('.sortth'),function(th){th.onclick=function(){var k=th.getAttribute('data-sort');if(TASKSORT.key===k)TASKSORT.dir*=-1;else{TASKSORT.key=k;TASKSORT.dir=1;}renderView();};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-status]'),function(sel){sel.onchange=function(){updateStatus(sel.getAttribute('data-status'),sel.value);};});
+  if(lead){
+    Array.prototype.forEach.call(document.querySelectorAll('[data-edit]'),function(a){a.onclick=function(){var t=S.tasks.filter(function(x){return String(x.id)===a.getAttribute('data-edit');})[0];openTaskForm(t.epic_id,t);};});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-del]'),function(a){a.onclick=function(){var id=a.getAttribute('data-del');confirmDo('Delete this task?',function(){return api('deleteTask',id);},'Task deleted');};});
+  }
+}
+function bindMyTaskRows(){Array.prototype.forEach.call(document.querySelectorAll('[data-status]'),function(sel){sel.onchange=function(){updateStatus(sel.getAttribute('data-status'),sel.value);};});}
+function updateStatus(id,status){
+  var t=S.tasks.filter(function(x){return String(x.id)===String(id);})[0];if(!t)return;
+  api('saveTask',{id:id,status:status}).then(function(){
+    t.status=status;
+    var e=S.epics.filter(function(x){return String(x.id)===String(t.epic_id);})[0];
+    // Marking the last open task done -> the event is complete, so archive it automatically.
+    if(e&&status==='Completed'&&String(e.archived||'').trim()===''&&eventComplete(e)){
+      api('setEventArchived',e.id,true).then(function(){e.archived='yes';toast('🎉 '+e.name+' complete — archived');renderView();}).catch(function(){toast('Updated');renderView();});
+    }else{toast('Updated');renderView();}
+  }).catch(apiErr);
+}
+
+/* ------------ calendar ------------ */
+function renderCalendar(){
+  var v=$('#view');
+  var items=activeEvents().filter(function(e){return e.event_date;}).sort(function(a,b){return a.event_date.localeCompare(b.event_date);});
+  var undated=activeEvents().filter(function(e){return !e.event_date;});
+  var groups={};items.forEach(function(e){var mo=e.event_date.slice(0,7);(groups[mo]=groups[mo]||[]).push(e);});
+  var html='<div class="row"><h2>Calendar of events</h2></div>';
+  if(!items.length&&!undated.length)html+='<div class="empty">No events scheduled.</div>';
+  Object.keys(groups).forEach(function(mo){
+    var d=new Date(mo+'-01');var label=d.toLocaleDateString(undefined,{month:'long',year:'numeric'});
+    html+='<h3 style="margin:14px 0 6px">'+esc(label)+'</h3><div class="grid cards">'+groups[mo].map(calCard).join('')+'</div>';
+  });
+  if(undated.length)html+='<h3 style="margin:14px 0 6px">No date set</h3><div class="grid cards">'+undated.map(calCard).join('')+'</div>';
+  v.innerHTML=html;
+  Array.prototype.forEach.call(v.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+}
+function calCard(e){var cd=countdown(e.event_date);var p=epicProgress(e.id);
+  return '<div class="card click" data-e="'+esc(e.id)+'"><div class="flex" style="justify-content:space-between"><b>'+esc(e.event_date||'—')+'</b><span class="small '+cd.cls+'">'+cd.txt+'</span></div>'
+   +'<div style="margin-top:4px">'+esc(e.name)+'</div><div class="small muted">'+esc(e.type||'')+' · '+p.done+'/'+p.total+' tasks</div></div>';}
+
+/* ------------ budget ------------ */
+function renderBudget(){
+  var v=$('#view');var can=S.meta.canManageBudget;
+  v.innerHTML='<div class="row"><h2>Budget</h2>'+(can?'<button class="primary" id="newB">+ Add line</button>':'')+'</div>'+budgetTable(S.budget||[]);
+  if(can)$('#newB').onclick=function(){openBudgetForm();};
+  bindBudgetRows();
+}
+function budgetTable(list){
+  if(!list.length)return '<div class="empty">No budget lines yet.</div>';
+  var epById={};S.epics.forEach(function(e){epById[e.id]=e.name;});
+  return '<table><thead><tr><th>Item</th><th>Event</th><th>Type</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>'
+    +list.map(function(b){return '<tr><td>'+esc(b.item)+'</td><td class="small muted">'+esc(epById[b.epic_id]||'—')+'</td><td class="small">'+esc(b.category)+'</td><td>'+money(b.amount)+'</td><td class="small">'+esc(b.status||'')+'</td>'
+      +'<td class="small">'+(S.meta.canManageBudget?'<a data-be="'+esc(b.id)+'">Edit</a> · <a data-bd="'+esc(b.id)+'" style="color:var(--bad)">✕</a>':'')+'</td></tr>';}).join('')
+    +'</tbody></table>';
+}
+function bindBudgetRows(){
+  Array.prototype.forEach.call(document.querySelectorAll('[data-be]'),function(a){a.onclick=function(){var b=(S.budget||[]).filter(function(x){return String(x.id)===a.getAttribute('data-be');})[0];openExpenseForm(b);};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bd]'),function(a){a.onclick=function(){var id=a.getAttribute('data-bd');confirmDo('Delete this budget line?',function(){return api('deleteBudget',id);},'Deleted');};});
+}
+
+/* ------------ members (admin) ------------ */
+var MEMFILTER='',MEMMODE='roster';
+function memSeg_(){return '<div class="seg"><button data-mm="roster" class="'+(MEMMODE==='roster'?'on':'')+'">Roster</button><button data-mm="assignments" class="'+(MEMMODE==='assignments'?'on':'')+'">Assignments</button></div>';}
+function bindMemSeg_(root){Array.prototype.forEach.call(root.querySelectorAll('.seg button[data-mm]'),function(b){b.onclick=function(){MEMMODE=b.getAttribute('data-mm');renderMembers();};});}
+function renderMembers(){
+  var v=$('#view');
+  if(MEMMODE==='assignments'){v.innerHTML='<div class="row"><h2>Class assignments</h2>'+memSeg_()+'</div><div id="memBody"><div class="empty">Loading…</div></div>';bindMemSeg_(v);renderAssignments($('#memBody'));return;}
+  var filter='<select id="mFilter" style="width:auto"><option value="">All members</option>'+(S.meta.classes||[]).map(function(c){return '<option'+(c===MEMFILTER?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select>';
+  var manage=S.meta.canManageMembers;
+  var list=MEMFILTER?S.members.filter(function(m){return String(m.class||'')===MEMFILTER;}):S.members;
+  v.innerHTML='<div class="row"><h2>Members</h2><div class="flex">'+memSeg_()+filter+(manage?'<button class="primary" id="newM">+ Add member</button>':'')+'</div></div>'
+   +(manage?'<p class="small muted">Members sign in with Google using the email listed here. Add an email + role (and a class for teachers) to grant access; remove the row to revoke.</p>':'<p class="small muted">Read-only view of the team and their roles.</p>')
+   +'<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Class</th>'+(manage?'<th>Invite link</th><th></th>':'')+'</tr></thead><tbody>'
+   +list.map(function(m){
+      var invite=m.link
+        ? '<a data-cp="'+esc(m.link)+'">Copy link</a> · <a data-rg="'+esc(m.email)+'" class="muted">reset</a>'
+        : '<span class="muted">—</span>';
+      return '<tr><td>'+esc(m.name)+'</td><td class="small">'+esc(m.email)+'</td><td><span class="chip">'+esc(roleLabel(m.role))+'</span></td>'
+       +'<td class="small">'+(m.class?'<span class="chip">'+esc(m.class)+'</span>':'<span class="muted">—</span>')+'</td>'
+       +(manage?'<td class="small">'+invite+'</td>'
+         +'<td class="small nowrap"><a data-me="'+esc(m.email)+'">Edit</a> · <a data-md="'+esc(m.email)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';}).join('')
+   +'</tbody></table>';
+  var mf=$('#mFilter');if(mf)mf.onchange=function(){MEMFILTER=this.value;renderMembers();};
+  var nm=$('#newM');if(nm)nm.onclick=function(){openMemberForm();};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-me]'),function(a){a.onclick=function(){var m=S.members.filter(function(x){return x.email===a.getAttribute('data-me');})[0];openMemberForm(m);};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-md]'),function(a){a.onclick=function(){var em=a.getAttribute('data-md');confirmDo('Remove '+em+'?',function(){return api('deleteMember',em);},'Removed');};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-cp]'),function(a){a.onclick=function(){copyText(a.getAttribute('data-cp'));};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-rg]'),function(a){a.onclick=function(){var em=a.getAttribute('data-rg');confirmDo('Reset invite link for '+em+'? Their current link stops working.',function(){return api('regenerateInvite',em);},'New link ready');};});
+  bindMemSeg_(v);
+}
+
+/* ------------ class assignments (per semester) ------------ */
+var ASG_SEM=null;
+function prevSemKey_(key){var y=parseInt(key,10);return String(key).slice(-1)==='S'?(y+'F'):((y-1)+'S');}
+function renderAssignments(container){
+  api('getAssignments',ASG_SEM||'').then(function(d){renderAssignmentsView(container,d);}).catch(function(e){container.innerHTML='<div class="empty">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function renderAssignmentsView(container,d){
+  ASG_SEM=d.semester;
+  var semSel='<select id="asgSem" style="width:auto">'+d.semesters.map(function(s){return '<option value="'+esc(s.key)+'"'+(s.key===d.semester?' selected':'')+'>'+esc(s.label)+' ('+esc(s.desc)+')'+(s.key===d.current?' — current':'')+'</option>';}).join('')+'</select>';
+  var byClass={};(d.rows||[]).forEach(function(r){(byClass[r.class]=byClass[r.class]||[]).push(r);});
+  var cards=(d.classes||[]).map(function(cls){
+    var team=byClass[cls]||[];
+    var rows=team.length?team.map(function(r){return '<div class="row" style="margin-bottom:6px"><span>'+esc(r.name)+' <span class="chip">'+esc(roleLabel(r.role))+'</span></span><a data-ax="'+esc(r.id)+'" style="color:var(--bad)">✕</a></div>';}).join(''):'<div class="small muted">No one assigned</div>';
+    return '<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">'+esc(cls)+'</h3><button class="sm" data-aa="'+esc(cls)+'">+ Add</button></div>'+rows+'</div>';
+  }).join('');
+  container.innerHTML='<div class="flex" style="margin-bottom:14px"><label style="margin:0">Semester</label> '+semSel+'<span class="spacer" style="flex:1"></span><button class="sm" id="asgCopy">Copy from previous semester</button></div>'
+    +'<div class="grid cards">'+cards+'</div>'
+    +'<p class="small muted" style="margin-top:14px">Teachers automatically see their assigned class for whichever semester we\'re in today.</p>';
+  var ss=$('#asgSem');if(ss)ss.onchange=function(){ASG_SEM=this.value;renderAssignments(container);};
+  Array.prototype.forEach.call(container.querySelectorAll('[data-aa]'),function(a){a.onclick=function(){openAssignForm(a.getAttribute('data-aa'),d);};});
+  Array.prototype.forEach.call(container.querySelectorAll('[data-ax]'),function(a){a.onclick=function(){var id=a.getAttribute('data-ax');api('deleteAssignment',id).then(function(){toast('Removed');renderAssignments(container);}).catch(apiErr);};});
+  var cb=$('#asgCopy');if(cb)cb.onclick=function(){api('copyAssignments',prevSemKey_(d.semester),d.semester).then(function(r){toast('Copied '+((r&&r.copied)||0)+' assignments');renderAssignments(container);}).catch(apiErr);};
+}
+function openAssignForm(cls,d){
+  var opts=(d.memberOptions||[]).map(function(m){return m.name+' — '+m.email;});
+  modal('Assign to '+cls,[
+    {name:'who',label:'Member',type:'select',options:opts},
+    {name:'role',label:'Role',type:'select',options:['Teacher','Co-Teacher'],value:'Teacher'},
+  ],function(o){
+    var mem=(d.memberOptions||[])[opts.indexOf(o.who)];if(!mem)throw new Error('Pick a member');
+    return api('saveAssignment',{email:mem.email,'class':cls,role:o.role==='Co-Teacher'?'co_teacher':'teacher',semester:d.semester}).then(function(){toast('Assigned');renderAssignments($('#memBody'));});
+  });
+}
+
+/* ------------ feedback ------------ */
+function renderFeedbackSection(e,lead){
+  var fb=(S.feedback||[]).filter(function(f){return String(f.epic_id)===String(e.id);});
+  var html='<div class="row" style="margin-top:22px"><h3>Feedback</h3><button class="sm" id="newF">+ Add feedback</button></div>';
+  if(!fb.length)html+='<div class="empty">No feedback captured. Add notes after the event so they become next year\'s tasks.</div>';
+  else html+='<table><tbody>'+fb.map(function(f){return '<tr><td>'+esc(f.text)+(f.converted?' <span class="pill p-Completed">carried forward</span>':'')+'</td>'
+    +'<td class="small" style="width:1%;white-space:nowrap">'+(lead&&!f.converted?'<a data-fc="'+esc(f.id)+'">→ Make task</a>':'')+(lead?' · <a data-fd="'+esc(f.id)+'" style="color:var(--bad)">✕</a>':'')+'</td></tr>';}).join('')+'</tbody></table>';
+  return html;
+}
+function bindFeedback(e,lead){
+  var b=$('#newF');if(b)b.onclick=function(){openFeedbackForm(e.id);};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-fc]'),function(a){a.onclick=function(){openCarryForward(a.getAttribute('data-fc'));};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-fd]'),function(a){a.onclick=function(){var id=a.getAttribute('data-fd');confirmDo('Delete feedback?',function(){return api('deleteFeedback',id);},'Deleted');};});
+}
+
+/* ------------ modal + forms ------------ */
+function modal(title,fields,onSubmit){
+  var bd=document.createElement('div');bd.className='backdrop';
+  bd.innerHTML='<div class="modal"><h3>'+esc(title)+'</h3><div id="mfields">'+fields.map(fieldHtml).join('')+'</div>'
+    +'<div class="actions"><button id="mCancel">Cancel</button><button class="primary" id="mSave">Save</button></div></div>';
+  document.body.appendChild(bd);
+  $('#mCancel',bd).onclick=function(){bd.remove();};
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#mSave',bd).onclick=function(){
+    var out={};var ok=true;
+    fields.forEach(function(f){var el=bd.querySelector('[name="'+f.name+'"]');var val=el?(el.type==='checkbox'?(el.checked?'yes':''):el.value):'';if(f.required&&!String(val).trim()){el.style.borderColor='var(--bad)';ok=false;}out[f.name]=val;});
+    if(!ok)return;
+    var btn=$('#mSave',bd);btn.disabled=true;btn.textContent='Saving…';
+    Promise.resolve(onSubmit(out)).then(function(){bd.remove();}).catch(function(e){btn.disabled=false;btn.textContent='Save';apiErr(e);});
+  };
+}
+function fieldHtml(f){
+  var v=f.value==null?'':f.value;
+  if(f.type==='select')return '<label>'+esc(f.label)+'</label><select name="'+f.name+'">'+f.options.map(function(o){return '<option '+(String(o)===String(v)?'selected':'')+'>'+esc(o)+'</option>';}).join('')+'</select>';
+  if(f.type==='textarea')return '<label>'+esc(f.label)+'</label><textarea name="'+f.name+'" rows="3">'+esc(v)+'</textarea>';
+  if(f.type==='checkbox')return '<label style="display:flex;align-items:center;gap:8px;font-weight:normal;margin-top:4px"><input name="'+f.name+'" type="checkbox" style="width:auto"'+(v?' checked':'')+'> '+esc(f.label)+(f.hint?' <span class="muted">('+esc(f.hint)+')</span>':'')+'</label>';
+  return '<label>'+esc(f.label)+(f.hint?' <span class="muted">('+esc(f.hint)+')</span>':'')+'</label><input name="'+f.name+'" type="'+(f.type||'text')+'" value="'+esc(v)+'">';
+}
+function reloadAfter(p,msg,then){return p.then(function(){return api('getBootstrap');}).then(function(d){S=d;if(msg)toast(msg);if(then)then();render();});}
+function apiErr(e){var m=(e&&e.message)||String(e);toast(m==='NOT_ALLOWED'?'Not allowed for your role':m==='ACCESS_DENIED'?'Access denied':m);}
+function confirmDo(q,fn,msg,then){modal(q,[],function(){return reloadAfter(fn(),msg,then);});var m=document.querySelector('.modal h3');if(m)m.style.fontWeight='500';}
+
+function openEpicForm(e){
+  e=e||{};
+  modal(e.id?'Edit event':'New event',[
+    {name:'name',label:'Event name',value:e.name,required:true},
+    {name:'program',label:'Program',type:'select',options:S.meta.programs,value:e.program},
+    {name:'event_date',label:'Event date',type:'date',value:e.event_date},
+    {name:'no_school',label:'No regular Sunday school this day',type:'checkbox',hint:'e.g. church event / holiday Sunday',value:e.no_school==='yes'},
+    {name:'status',label:'Status',type:'select',options:S.meta.epicStatus,value:e.status},
+    {name:'notes',label:'Notes',type:'textarea',value:e.notes},
+  ],function(o){o.id=e.id;return reloadAfter(api('saveEpic',o),'Saved');});
+}
+function openTaskForm(epicId,t){
+  t=t||{};
+  var owners=['(unassigned)'].concat(S.memberOptions);
+  var evList=S.epics.filter(function(e){return String(e.archived||'').trim()==='';});
+  function evLabel(e){return e.name+(e.event_date?' ('+e.event_date+')':'');}
+  var evNames=evList.map(evLabel),evByLabel={};evList.forEach(function(e){evByLabel[evLabel(e)]=e.id;});
+  var curEv=epicId?evLabel(evList.filter(function(e){return String(e.id)===String(epicId);})[0]||{name:''}):'';
+  if(!curEv){var pl=evList.filter(function(e){return String(e.name).toLowerCase().indexOf('planning')>=0;})[0];curEv=pl?evLabel(pl):(evNames[0]||'');}
+  modal(t.id?'Edit task':'New task',[
+    {name:'title',label:'Task',value:t.title,required:true},
+    {name:'eventName',label:'Event',type:'select',options:evNames,value:curEv},
+    {name:'owner',label:'Owner',type:'select',options:owners,value:t.owner||'(unassigned)'},
+    {name:'due_offset',label:'Due before event',hint:'e.g. -6w, -3d (for dated events)',value:t.due_offset},
+    {name:'due_date',label:'Or a specific date',type:'date',value:t.due_date},
+    {name:'priority',label:'Priority',type:'select',options:S.meta.taskPriority,value:t.priority||'Medium'},
+    {name:'status',label:'Status',type:'select',options:S.meta.taskStatus,value:t.status||'Pending'},
+    {name:'notes',label:'Notes',type:'textarea',value:t.notes},
+  ],function(o){o.id=t.id;o.epic_id=evByLabel[o.eventName]||epicId||'';if(o.owner==='(unassigned)')o.owner='';return reloadAfter(api('saveTask',o),'Saved');});
+}
+function openCloneForm(e){
+  modal('Clone "'+e.name+'"',[
+    {name:'name',label:'New event name',value:e.name.replace(/\d{4}/,function(y){return (parseInt(y,10)+1);}),required:true},
+    {name:'event_date',label:'New event date',type:'date',value:''},
+  ],function(o){return reloadAfter(api('cloneEpic',e.id,o.name,o.event_date),'Cloned with tasks');});
+}
+function openMemberForm(m){
+  m=m||{};
+  modal(m.email?'Edit member':'Add member',[
+    {name:'name',label:'Name',value:m.name},
+    {name:'email',label:'Gmail address',value:m.email,required:true},
+    {name:'role',label:'Role',type:'select',options:S.meta.roles.map(roleLabel),value:m.role?roleLabel(m.role):'Teacher'},
+    {name:'class',label:'Class (only for teacher / co-teacher)',type:'select',options:['(none)'].concat(S.meta.classes||[]),value:m['class']||'(none)'},
+  ],function(o){o.role=unLabel(o.role);o.email=m.email||o.email;if(o['class']==='(none)')o['class']='';return reloadAfter(api('saveMember',o),'Saved');});
+}
+function unLabel(l){var map={Administrator:'admin','Co-Leader':'co_leader',Teacher:'teacher','Co-Teacher':'co_teacher',Treasurer:'treasurer','Board Rep':'board_rep',Chairman:'chairman'};return map[l]||l;}
+function openBudgetForm(b){
+  b=b||{};
+  var epicOpts=['(none)'].concat(S.epics.map(function(e){return e.name;}));
+  var cur=b.epic_id?(S.epics.filter(function(e){return String(e.id)===String(b.epic_id);})[0]||{}).name:'(none)';
+  modal(b.id?'Edit line':'Add budget line',[
+    {name:'item',label:'Item',value:b.item,required:true},
+    {name:'epicName',label:'Event',type:'select',options:epicOpts,value:cur},
+    {name:'category',label:'Type',type:'select',options:['expense','income'],value:b.category||'expense'},
+    {name:'amount',label:'Amount',type:'number',value:b.amount},
+    {name:'status',label:'Status',type:'select',options:['Planned','Approved','Paid'],value:b.status||'Planned'},
+    {name:'notes',label:'Notes',type:'textarea',value:b.notes},
+  ],function(o){var ep=S.epics.filter(function(e){return e.name===o.epicName;})[0];o.epic_id=ep?ep.id:'';o.id=b.id;return reloadAfter(api('saveBudget',o),'Saved');});
+}
+function openFeedbackForm(epicId){
+  modal('Add feedback',[{name:'text',label:'Feedback',type:'textarea',required:true}],
+    function(o){o.epic_id=epicId;return reloadAfter(api('saveFeedback',o),'Saved');});
+}
+function openCarryForward(fbId){
+  var epicOpts=S.epics.map(function(e){return e.name;});
+  var owners=['(unassigned)'].concat(S.memberOptions);
+  modal('Carry feedback into a task',[
+    {name:'epicName',label:'Target epic',type:'select',options:epicOpts,value:epicOpts[0]},
+    {name:'due_offset',label:'Due',hint:'e.g. -6w',value:''},
+    {name:'owner',label:'Owner',type:'select',options:owners,value:'(unassigned)'},
+  ],function(o){var ep=S.epics.filter(function(e){return e.name===o.epicName;})[0];var owner=o.owner==='(unassigned)'?'':o.owner;return reloadAfter(api('convertFeedbackToTask',fbId,ep?ep.id:'',o.due_offset,owner),'Task created');});
+}
+
+boot();
+</script>
+</body>
+</html>

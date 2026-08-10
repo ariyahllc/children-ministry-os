@@ -1,0 +1,3 @@
+# Only push the actual app to Apps Script.
+preview.html
+*.md
