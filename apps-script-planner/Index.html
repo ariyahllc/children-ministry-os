@@ -633,7 +633,7 @@ function leaderDash(){
   var v=$('#view');
   v.innerHTML='<div class="row"><h2>Dashboard</h2><div class="flex"><button class="sm" id="notesBtn">📝 Notes → tasks</button><button class="primary" id="newEpic">+ New event</button></div></div>'
    +'<div class="kpis">'
-   +kpi(activeEvents().length,'Events')+kpi(S.tasks.length,'Tasks')
+   +kpi(activeEventsCurAy().length,'Events '+ayLabel(curAcademicYear()))+kpi(S.tasks.length,'Tasks')
    +kpi(overdue.length,'Overdue',overdue.length?'var(--bad)':'')+kpi(unassigned.length,'Unassigned',unassigned.length?'var(--warn)':'')
    +'</div>'
    +'<h3>Events</h3><div class="grid cards" id="epicCards"></div>'
@@ -657,17 +657,68 @@ function treasurerDash(){renderFinances();}
 var FINMODE='expenses';
 function renderFinances(){
   var v=$('#view');
-  v.innerHTML='<div class="row"><h2>'+(FINMODE==='offertory'?'Offertory':'Expenses')+'</h2><div class="seg">'
+  var titles={offertory:'Offertory',budget:'Budget',expenses:'Expenses'};
+  v.innerHTML='<div class="row"><h2>'+titles[FINMODE]+'</h2><div class="seg">'
+    +'<button data-fm="budget" class="'+(FINMODE==='budget'?'on':'')+'">Budget</button>'
     +'<button data-fm="expenses" class="'+(FINMODE==='expenses'?'on':'')+'">Expenses</button>'
     +'<button data-fm="offertory" class="'+(FINMODE==='offertory'?'on':'')+'">Offertory</button>'
     +'</div></div><div id="finBody"></div>';
   Array.prototype.forEach.call(v.querySelectorAll('.seg button'),function(b){b.onclick=function(){FINMODE=b.getAttribute('data-fm');renderFinances();};});
   if(FINMODE==='offertory')renderOffertoryInto($('#finBody'));
+  else if(FINMODE==='budget')renderBudgetInto($('#finBody'));
   else renderExpensesInto($('#finBody'));
 }
 function renderOffertoryInto(container){
   container.innerHTML='<div id="offBody"><div class="empty">Loading…</div></div>';
   api('getOffertory',OFY||'').then(renderOffertoryTable).catch(function(e){var b=$('#offBody');if(b)b.innerHTML='<div class="empty">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+var BUFY=null;
+function renderBudgetInto(container){
+  var can=S.meta.canManageBudget;
+  var plan=(S.budgetPlan||[]);
+  var exp=(S.budget||[]).filter(function(b){return b.category!=='income';});
+  var years={};plan.forEach(function(b){if(/^\d{4}$/.test(String(b.fy||'')))years[b.fy]=true;});
+  exp.forEach(function(b){var m=String(b.date||'').match(/^(\d{4})/);if(m)years[m[1]]=true;});
+  var cy=String(new Date().getFullYear());years[cy]=true;
+  var yearList=Object.keys(years).sort();
+  if(BUFY==null||yearList.indexOf(BUFY)<0)BUFY=(yearList.indexOf(cy)>=0?cy:yearList[yearList.length-1]);
+  var lines=plan.filter(function(b){return String(b.fy)===BUFY;}).slice().sort(function(a,b){return String(a.category).localeCompare(String(b.category));});
+  // spent per budget_category (this FY, non-income expenses)
+  var spentBy={},uncat=0;
+  exp.filter(function(b){return String(b.date||'').slice(0,4)===BUFY;}).forEach(function(b){
+    var c=String(b.budget_category||'').trim();var amt=Number(b.amount)||0;
+    if(c)spentBy[c.toLowerCase()]=(spentBy[c.toLowerCase()]||0)+amt;else uncat+=amt;
+  });
+  var totB=0,totS=0;
+  var rows=lines.map(function(l){
+    var b=Number(l.amount)||0;var s=spentBy[String(l.category).trim().toLowerCase()]||0;var left=b-s;totB+=b;totS+=s;
+    var pct=b>0?Math.min(100,Math.round(s*100/b)):0;var over=s>b;
+    return '<tr><td>'+esc(l.category)+'</td><td style="text-align:right">'+money(b)+'</td><td style="text-align:right">'+money(s)+'</td>'
+      +'<td style="text-align:right'+(left<0?';color:var(--bad)':'')+'">'+money(left)+'</td>'
+      +'<td style="min-width:120px"><div class="bar"><i style="width:'+pct+'%'+(over?';background:var(--bad)':'')+'"></i></div></td>'
+      +(can?'<td class="small nowrap"><a data-ble="'+esc(l.id)+'">Edit</a> · <a data-bld="'+esc(l.id)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';
+  }).join('');
+  var totLeft=totB-totS;
+  container.innerHTML='<div class="row" style="margin-top:4px"><div class="flex"><label class="small muted" style="margin:0">Financial year (Jan–Dec)</label><select id="buYear" style="width:auto">'+yearList.map(function(y){return '<option'+(y===BUFY?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select></div>'+(can?'<button class="primary" id="newBL">+ Add budget line</button>':'')+'</div>'
+    +'<div class="kpis">'+kpi(money(totB),'Budget')+kpi(money(totS),'Spent')+kpi(money(totLeft),'Left',totLeft<0?'var(--bad)':'')+'</div>'
+    +(lines.length?('<table><thead><tr><th>Category</th><th style="text-align:right">Budget</th><th style="text-align:right">Spent</th><th style="text-align:right">Left</th><th>Used</th>'+(can?'<th></th>':'')+'</tr></thead><tbody>'+rows
+      +'<tr style="font-weight:600;border-top:2px solid var(--line)"><td>Total</td><td style="text-align:right">'+money(totB)+'</td><td style="text-align:right">'+money(totS)+'</td><td style="text-align:right'+(totLeft<0?';color:var(--bad)':'')+'">'+money(totLeft)+'</td><td></td>'+(can?'<td></td>':'')+'</tr>'
+      +'</tbody></table>'):'<div class="empty">No budget set for '+esc(BUFY)+'.'+(can?' Add a line.':'')+'</div>')
+    +(uncat>0?'<p class="small muted">'+money(uncat)+' in expenses this year isn\'t tagged to a budget category — edit an expense to assign one.</p>':'');
+  var ys=$('#buYear');if(ys)ys.onchange=function(){BUFY=this.value;renderFinances();};
+  if(can){var nb=$('#newBL');if(nb)nb.onclick=function(){openBudgetLineForm(null);};
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ble]'),function(a){a.onclick=function(){var l=(S.budgetPlan||[]).filter(function(x){return String(x.id)===a.getAttribute('data-ble');})[0];openBudgetLineForm(l);};});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bld]'),function(a){a.onclick=function(){var id=a.getAttribute('data-bld');confirmDo('Delete this budget line?',function(){return api('deleteBudgetLine',id);},'Deleted');};});
+  }
+}
+function openBudgetLineForm(l){
+  l=l||{};
+  modal(l.id?'Edit budget line':'Add budget line',[
+    {name:'fy',label:'Financial year (YYYY)',value:l.fy||String(BUFY||new Date().getFullYear()),required:true},
+    {name:'category',label:'Category',value:l.category,required:true},
+    {name:'amount',label:'Budget amount ($)',type:'number',value:l.amount},
+    {name:'notes',label:'Notes',type:'textarea',value:l.notes},
+  ],function(out){return reloadAfter(api('saveBudgetLine',{id:l.id,fy:out.fy,category:out.category,amount:out.amount,notes:out.notes}),'Saved');});
 }
 function isReimbursed(b){return /yes|reimbursed/i.test(String(b.reimbursed||''));}
 var EXFY=null;
@@ -693,13 +744,14 @@ function expensesTable(list){
   if(!list.length)return '<div class="empty">No expenses yet.'+(S.meta.canManageBudget?' Add one — you can attach a receipt.':'')+'</div>';
   var epById={};S.epics.forEach(function(e){epById[e.id]=e.name;});
   var can=S.meta.canManageBudget;
-  return '<table><thead><tr><th>Date</th><th>Item</th><th>Event</th><th style="text-align:right">Amount</th><th>Paid by</th><th>Reimbursed</th><th>Receipt</th>'+(can?'<th></th>':'')+'</tr></thead><tbody>'
+  return '<table><thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Event</th><th style="text-align:right">Amount</th><th>Paid by</th><th>Reimbursed</th><th>Receipt</th>'+(can?'<th></th>':'')+'</tr></thead><tbody>'
     +list.map(function(b){
       var yes=isReimbursed(b);
       var rc=b.receipt_url?'<a href="'+esc(b.receipt_url)+'" target="_blank">view</a>':'<span class="muted">—</span>';
       var rb=can?'<span data-rb="'+esc(b.id)+'" class="tgl'+(yes?' on':'')+'" style="cursor:pointer" title="Toggle reimbursed"></span>'
               :'<span class="pill '+(yes?'p-Completed':'p-Pending')+'">'+(yes?'Yes':'No')+'</span>';
-      return '<tr><td class="small nowrap">'+esc(b.date||'—')+'</td><td>'+esc(b.item)+'</td><td class="small muted">'+esc(epById[b.epic_id]||'—')+'</td>'
+      var bc=b.budget_category?'<span class="chip">'+esc(b.budget_category)+'</span>':(b.category==='income'?'<span class="muted">income</span>':'<span class="pill p-Pending">untagged</span>');
+      return '<tr><td class="small nowrap">'+esc(b.date||'—')+'</td><td>'+esc(b.item)+'</td><td class="small">'+bc+'</td><td class="small muted">'+esc(epById[b.epic_id]||'—')+'</td>'
         +'<td style="text-align:right">'+money(b.amount)+'</td><td class="small">'+esc(b.paid_by||'')+'</td><td>'+rb+'</td><td class="small">'+rc+'</td>'
         +(can?'<td class="small" style="white-space:nowrap"><a data-be="'+esc(b.id)+'">Edit</a> · <a data-bd="'+esc(b.id)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';
     }).join('')+'</tbody></table>';
@@ -719,6 +771,11 @@ function bindReimburseToggles(){
     api('saveBudget',{id:id,reimbursed:next}).catch(function(e){a.classList.toggle('on',next!=='Yes');b.reimbursed=(next==='Yes'?'No':'Yes');updateExpenseKpis();apiErr(e);});
   };});
 }
+function budCatOpts(cur){
+  var set={};(S.budgetPlan||[]).forEach(function(l){var c=String(l.category||'').trim();if(c)set[c]=true;});
+  if(cur&&String(cur).trim())set[String(cur).trim()]=true;
+  return Object.keys(set).sort();
+}
 function openExpenseForm(b){
   b=b||{};
   var epicOpts=['(none)'].concat(S.epics.map(function(e){return e.name;}));
@@ -729,6 +786,7 @@ function openExpenseForm(b){
     +'<label>Date</label><input type="date" id="eDate" value="'+esc(b.date||'')+'">'
     +'<label>Amount ($)</label><input type="number" id="eAmt" value="'+esc(b.amount||'')+'">'
     +'<label>Type</label><select id="eCat"><option value="expense"'+(b.category!=='income'?' selected':'')+'>expense</option><option value="income"'+(b.category==='income'?' selected':'')+'>income</option></select>'
+    +'<label>Budget category</label><select id="eBudCat"><option value="">— none —</option>'+budCatOpts(b.budget_category).map(function(c){return '<option'+(c===String(b.budget_category||'')?' selected':'')+'>'+esc(c)+'</option>';}).join('')+'</select>'
     +'<label>Event (optional)</label><select id="eEpic">'+epicOpts.map(function(n){return '<option'+(n===curEp?' selected':'')+'>'+esc(n)+'</option>';}).join('')+'</select>'
     +'<label>Paid by</label><input id="ePaid" value="'+esc(b.paid_by||'')+'" placeholder="who fronted the money">'
     +'<label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="eReimb" style="width:auto"'+(isReimbursed(b)?' checked':'')+'> Reimbursed</label>'
@@ -740,9 +798,10 @@ function openExpenseForm(b){
   $('#eCancel',bd).onclick=function(){bd.remove();};
   $('#eSave',bd).onclick=function(){
     var item=$('#eItem',bd).value.trim();if(!item){$('#eItem',bd).style.borderColor='var(--bad)';return;}
+    if($('#eCat',bd).value!=='income'&&!$('#eBudCat',bd).value){$('#eBudCat',bd).style.borderColor='var(--bad)';toast('Pick a budget category');return;}
     var btn=$('#eSave',bd);btn.disabled=true;btn.textContent='Saving…';
     var ep=S.epics.filter(function(e){return e.name===$('#eEpic',bd).value;})[0];
-    var payload={id:b.id,item:item,date:$('#eDate',bd).value,amount:$('#eAmt',bd).value,category:$('#eCat',bd).value,epic_id:ep?ep.id:'',paid_by:$('#ePaid',bd).value,reimbursed:$('#eReimb',bd).checked?'Yes':'No',notes:$('#eNotes',bd).value};
+    var payload={id:b.id,item:item,date:$('#eDate',bd).value,amount:$('#eAmt',bd).value,category:$('#eCat',bd).value,budget_category:$('#eBudCat',bd).value,epic_id:ep?ep.id:'',paid_by:$('#ePaid',bd).value,reimbursed:$('#eReimb',bd).checked?'Yes':'No',notes:$('#eNotes',bd).value};
     function finish(){reloadAfter(api('saveBudget',payload),'Saved').then(function(){bd.remove();}).catch(function(e){btn.disabled=false;btn.textContent='Save';apiErr(e);});}
     var file=$('#eRcpt',bd).files[0];
     if(file){
@@ -767,6 +826,8 @@ function sectionTasks(title,list){
 
 /* ------------ epic cards + lists ------------ */
 function activeEvents(){return S.epics.filter(function(e){return String(e.archived||'').trim()==='';});}
+function curAcademicYear(){var d=new Date();return d.getMonth()>=6?d.getFullYear():d.getFullYear()-1;}
+function activeEventsCurAy(){var ay=curAcademicYear();return activeEvents().filter(function(e){return !e.event_date||ayOf(e.event_date)===ay;});}
 function eventCard(e){
   var p=epicProgress(e.id);var cd=countdown(e.event_date);
   var arch=String(e.archived||'').trim()!=='';var done=eventComplete(e);
@@ -780,7 +841,7 @@ function eventCard(e){
     +'</div>';
 }
 function renderEpicCards(container,readonly){
-  var list=activeEvents();
+  var list=activeEventsCurAy();
   if(!list.length){container.className='';container.innerHTML='<div class="empty">No events yet.</div>';return;}
   container.className='';
   function pad(n){return (n<10?'0':'')+n;}
