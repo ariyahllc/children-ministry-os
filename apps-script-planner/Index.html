@@ -453,20 +453,24 @@ function renderSundayPhotos(){
   host.innerHTML='<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Photos <span class="small muted">'+esc(WK.cls)+' · '+esc(WK.date)+'</span></h3>'
     +(canEdit?'<label class="sm" style="cursor:pointer;margin:0">＋ Upload<input type="file" id="wkPhotoIn" accept="image/*" multiple style="display:none"></label>':'')+'</div>'
     +'<div class="small muted" style="margin-bottom:8px">Visible to all teachers & leaders.'+(canEdit?'':' Your class teacher can add photos.')+'</div>'
-    +'<div id="wkPhotoGrid"><div class="small muted">Loading…</div></div></div>';
+    +'<div id="wkPhotoGrid"><button class="sm" id="wkPhotoLoad">Show photos</button></div></div>';
   var inp=$('#wkPhotoIn');if(inp)inp.onchange=function(){uploadSundayPhotos(this.files);};
-  api('getSundayPhotos',WK.date,WK.cls).then(function(list){paintPhotoGrid(list,canEdit);}).catch(function(e){var g=$('#wkPhotoGrid');if(g)g.innerHTML='<div class="small muted">'+esc((e&&e.message)||'Could not load')+'</div>';});
+  var ld=$('#wkPhotoLoad');if(ld)ld.onclick=loadSundayPhotosNow;
+}
+function loadSundayPhotosNow(){
+  var g=$('#wkPhotoGrid');if(g)g.innerHTML='<div class="small muted">Loading…</div>';
+  api('getSundayPhotos',WK.date,WK.cls).then(function(list){paintPhotoGrid(list,canEditSundayPhotos());}).catch(function(e){if(g)g.innerHTML='<div class="small muted">'+esc((e&&e.message)||'Could not load')+'</div>';});
 }
 function paintPhotoGrid(list,canEdit){
   var g=$('#wkPhotoGrid');if(!g)return;
   if(!list.length){g.innerHTML='<div class="empty">No photos yet.</div>';return;}
   g.style.display='grid';g.style.gridTemplateColumns='repeat(auto-fill,minmax(120px,1fr))';g.style.gap='8px';
   g.innerHTML=list.map(function(p){return '<div style="position:relative"><a href="'+p.dataUrl+'" target="_blank"><img src="'+p.dataUrl+'" style="width:100%;height:110px;object-fit:cover;border-radius:8px;display:block"></a>'+(canEdit?'<span data-delp="'+esc(p.id)+'" title="Delete" style="position:absolute;top:4px;right:6px;color:#fff;background:rgba(0,0,0,.55);border-radius:50%;width:20px;height:20px;text-align:center;line-height:19px;cursor:pointer">✕</span>':'')+'</div>';}).join('');
-  if(canEdit)Array.prototype.forEach.call(g.querySelectorAll('[data-delp]'),function(a){a.onclick=function(){api('deleteSundayPhoto',WK.date,WK.cls,a.getAttribute('data-delp')).then(function(){renderSundayPhotos();}).catch(apiErr);};});
+  if(canEdit)Array.prototype.forEach.call(g.querySelectorAll('[data-delp]'),function(a){a.onclick=function(){api('deleteSundayPhoto',WK.date,WK.cls,a.getAttribute('data-delp')).then(function(){loadSundayPhotosNow();}).catch(apiErr);};});
 }
 function uploadSundayPhotos(files){
   if(!files||!files.length)return;var arr=Array.prototype.slice.call(files),done=0,fail=0;toast('Uploading '+arr.length+'…');
-  arr.forEach(function(file){var r=new FileReader();r.onload=function(){api('uploadSundayPhoto',WK.date,WK.cls,r.result,file.name).then(function(){done++;if(done+fail===arr.length){toast(fail?('Uploaded '+done+', '+fail+' failed'):'Uploaded');renderSundayPhotos();}}).catch(function(e){fail++;if(done+fail===arr.length){renderSundayPhotos();}apiErr(e);});};r.readAsDataURL(file);});
+  arr.forEach(function(file){var r=new FileReader();r.onload=function(){api('uploadSundayPhoto',WK.date,WK.cls,r.result,file.name).then(function(){done++;if(done+fail===arr.length){toast(fail?('Uploaded '+done+', '+fail+' failed'):'Uploaded');loadSundayPhotosNow();}}).catch(function(e){fail++;if(done+fail===arr.length){loadSundayPhotosNow();}apiErr(e);});};r.readAsDataURL(file);});
 }
 function lessonLabelJS(n){n=Number(n)||0;return n>0?('Unit '+(Math.floor((n-1)/10)+1)+' · Lesson '+n):'';}
 function lessonBlockHtml(d){
@@ -1288,10 +1292,14 @@ function renderEventMedia(eventId){
   host.innerHTML='<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Photos &amp; Videos</h3><div class="flex">'
     +'<label class="sm" style="cursor:pointer;margin:0">＋ Photos<input type="file" id="evPhotoIn" accept="image/*" multiple style="display:none"></label>'
     +'<label class="sm" style="cursor:pointer;margin:0">＋ Videos<input type="file" id="evVideoIn" accept="video/*" multiple style="display:none"></label></div></div>'
-    +'<div id="evMediaBody"><div class="small muted">Loading…</div></div></div>';
+    +'<div id="evMediaBody"><button class="sm" id="evLoad">Show photos &amp; videos</button></div></div>';
   var pi=$('#evPhotoIn');if(pi)pi.onchange=function(){uploadEventFiles(eventId,this.files,'Photos');};
   var vi=$('#evVideoIn');if(vi)vi.onchange=function(){uploadEventFiles(eventId,this.files,'Videos');};
-  api('getEventMedia',eventId).then(function(m){paintEventMedia(eventId,m);}).catch(function(er){var b=$('#evMediaBody');if(b)b.innerHTML='<div class="small muted">'+esc((er&&er.message)||'Could not load')+'</div>';});
+  var ld=$('#evLoad');if(ld)ld.onclick=function(){loadEventMediaNow(eventId);};
+}
+function loadEventMediaNow(eventId){
+  var b=$('#evMediaBody');if(b)b.innerHTML='<div class="small muted">Loading…</div>';
+  api('getEventMedia',eventId).then(function(m){paintEventMedia(eventId,m);}).catch(function(er){if(b)b.innerHTML='<div class="small muted">'+esc((er&&er.message)||'Could not load')+'</div>';});
 }
 function paintEventMedia(eventId,m){
   var b=$('#evMediaBody');if(!b)return;var ph=m.photos||[],vd=m.videos||[];var html='';
@@ -1299,12 +1307,12 @@ function paintEventMedia(eventId,m){
   if(vd.length)html+='<div class="small muted" style="margin-bottom:6px">Videos</div>'+vd.map(function(v){return '<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><a data-vid="'+esc(v.id)+'" style="cursor:pointer">▶ '+esc(v.name)+'</a><span class="small muted">'+(Math.round((v.size||0)/1048576*10)/10)+' MB · <a data-delm="'+esc(v.id)+'" style="color:var(--bad);cursor:pointer">delete</a></span></div>';}).join('');
   if(!ph.length&&!vd.length)html='<div class="empty">No media yet.</div>';
   b.innerHTML=html+'<div id="evVidPlayer"></div>';
-  Array.prototype.forEach.call(b.querySelectorAll('[data-delm]'),function(a){a.onclick=function(){api('deleteEventMedia',eventId,a.getAttribute('data-delm')).then(function(){renderEventMedia(eventId);}).catch(apiErr);};});
+  Array.prototype.forEach.call(b.querySelectorAll('[data-delm]'),function(a){a.onclick=function(){api('deleteEventMedia',eventId,a.getAttribute('data-delm')).then(function(){loadEventMediaNow(eventId);}).catch(apiErr);};});
   Array.prototype.forEach.call(b.querySelectorAll('[data-vid]'),function(a){a.onclick=function(){var host=$('#evVidPlayer');host.innerHTML='<div class="small muted" style="margin-top:8px">Loading video…</div>';api('getMediaFile',a.getAttribute('data-vid')).then(function(f){host.innerHTML='<video controls src="'+f.dataUrl+'" style="width:100%;max-height:420px;margin-top:10px;border-radius:8px"></video>';}).catch(apiErr);};});
 }
 function uploadEventFiles(eventId,files,kind){
   if(!files||!files.length)return;var arr=Array.prototype.slice.call(files),done=0,fail=0;toast('Uploading '+arr.length+' '+kind.toLowerCase()+'…');
-  arr.forEach(function(file){var r=new FileReader();r.onload=function(){api('uploadEventMedia',eventId,r.result,file.name,kind).then(function(){done++;if(done+fail===arr.length){toast(fail?('Uploaded '+done+', '+fail+' failed'):'Uploaded');renderEventMedia(eventId);}}).catch(function(e){fail++;if(done+fail===arr.length)renderEventMedia(eventId);apiErr(e);});};r.readAsDataURL(file);});
+  arr.forEach(function(file){var r=new FileReader();r.onload=function(){api('uploadEventMedia',eventId,r.result,file.name,kind).then(function(){done++;if(done+fail===arr.length){toast(fail?('Uploaded '+done+', '+fail+' failed'):'Uploaded');loadEventMediaNow(eventId);}}).catch(function(e){fail++;if(done+fail===arr.length)loadEventMediaNow(eventId);apiErr(e);});};r.readAsDataURL(file);});
 }
 function flyerHtml(f){
   f=f||{};var p=f.palette||{};var bg=p.bg||'#1f4d3a',ac=p.accent||'#e6b800',tx=p.text||'#ffffff';
