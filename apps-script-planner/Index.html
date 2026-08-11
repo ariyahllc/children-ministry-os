@@ -434,8 +434,9 @@ function renderWeeklyForm(d){
       +'<label>Notes <span class="muted small">(what you\'ll share with parents)</span></label><textarea id="wkNotes">'+esc(d.notes)+'</textarea>'
       +'<button type="button" class="sm" id="wkCopy" style="margin-top:8px">📋 Copy summary for parents</button>'
       +'<div style="margin-top:14px"><button class="primary" id="wkSave">Save this Sunday</button></div>'
-    +'</div></div><div id="wkHist" style="margin-top:22px"></div>';
+    +'</div></div><div id="wkPhotos" style="margin-top:22px"></div><div id="wkHist" style="margin-top:22px"></div>';
   bindLessonControls(d);
+  renderSundayPhotos();
   var cpy=$('#wkCopy');if(cpy)cpy.onclick=function(){copyText(parentSummary());toast('Summary copied — paste into the class WhatsApp group');};
   function upd(){var n=b.querySelectorAll('.attrow.on').length;var el=$('#attCount');if(el)el.textContent='· '+n+' / '+roster.length+' present';}
   Array.prototype.forEach.call(b.querySelectorAll('.attrow'),function(r){r.onclick=function(){r.classList.toggle('on');upd();};});
@@ -445,6 +446,27 @@ function renderWeeklyForm(d){
   $('#wkSave').onclick=saveWeeklyNow;
   bindAnnouncement(WK.date,d.announcement);
   loadWeeklyHistory();
+}
+function canEditSundayPhotos(){return S.meta.canManageEpics||((S.me.role==='teacher'||S.me.role==='co_teacher')&&String(S.me.class||'')===String(WK.cls||''));}
+function renderSundayPhotos(){
+  var host=$('#wkPhotos');if(!host)return;var canEdit=canEditSundayPhotos();
+  host.innerHTML='<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Photos <span class="small muted">'+esc(WK.cls)+' · '+esc(WK.date)+'</span></h3>'
+    +(canEdit?'<label class="sm" style="cursor:pointer;margin:0">＋ Upload<input type="file" id="wkPhotoIn" accept="image/*" multiple style="display:none"></label>':'')+'</div>'
+    +'<div class="small muted" style="margin-bottom:8px">Visible to all teachers & leaders.'+(canEdit?'':' Your class teacher can add photos.')+'</div>'
+    +'<div id="wkPhotoGrid"><div class="small muted">Loading…</div></div></div>';
+  var inp=$('#wkPhotoIn');if(inp)inp.onchange=function(){uploadSundayPhotos(this.files);};
+  api('getSundayPhotos',WK.date,WK.cls).then(function(list){paintPhotoGrid(list,canEdit);}).catch(function(e){var g=$('#wkPhotoGrid');if(g)g.innerHTML='<div class="small muted">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function paintPhotoGrid(list,canEdit){
+  var g=$('#wkPhotoGrid');if(!g)return;
+  if(!list.length){g.innerHTML='<div class="empty">No photos yet.</div>';return;}
+  g.style.display='grid';g.style.gridTemplateColumns='repeat(auto-fill,minmax(120px,1fr))';g.style.gap='8px';
+  g.innerHTML=list.map(function(p){return '<div style="position:relative"><a href="'+p.dataUrl+'" target="_blank"><img src="'+p.dataUrl+'" style="width:100%;height:110px;object-fit:cover;border-radius:8px;display:block"></a>'+(canEdit?'<span data-delp="'+esc(p.id)+'" title="Delete" style="position:absolute;top:4px;right:6px;color:#fff;background:rgba(0,0,0,.55);border-radius:50%;width:20px;height:20px;text-align:center;line-height:19px;cursor:pointer">✕</span>':'')+'</div>';}).join('');
+  if(canEdit)Array.prototype.forEach.call(g.querySelectorAll('[data-delp]'),function(a){a.onclick=function(){api('deleteSundayPhoto',WK.date,WK.cls,a.getAttribute('data-delp')).then(function(){renderSundayPhotos();}).catch(apiErr);};});
+}
+function uploadSundayPhotos(files){
+  if(!files||!files.length)return;var arr=Array.prototype.slice.call(files),done=0,fail=0;toast('Uploading '+arr.length+'…');
+  arr.forEach(function(file){var r=new FileReader();r.onload=function(){api('uploadSundayPhoto',WK.date,WK.cls,r.result,file.name).then(function(){done++;if(done+fail===arr.length){toast(fail?('Uploaded '+done+', '+fail+' failed'):'Uploaded');renderSundayPhotos();}}).catch(function(e){fail++;if(done+fail===arr.length){renderSundayPhotos();}apiErr(e);});};r.readAsDataURL(file);});
 }
 function lessonLabelJS(n){n=Number(n)||0;return n>0?('Unit '+(Math.floor((n-1)/10)+1)+' · Lesson '+n):'';}
 function lessonBlockHtml(d){
@@ -729,7 +751,7 @@ function renderExpensesInto(container){
   var cy=String(new Date().getFullYear());years[cy]=true;
   var yearList=Object.keys(years).sort();
   if(EXFY==null||yearList.indexOf(EXFY)<0)EXFY=(yearList.indexOf(cy)>=0?cy:yearList[yearList.length-1]);
-  var exp=allExp.filter(function(b){return String(b.date||'').slice(0,4)===EXFY;}).slice().sort(function(a,b){return String(b.date||'').localeCompare(String(a.date||''));});
+  var exp=sortExpenses(allExp.filter(function(b){return String(b.date||'').slice(0,4)===EXFY;}));
   var total=exp.reduce(function(a,b){return a+(Number(b.amount)||0);},0);
   var reimb=exp.filter(isReimbursed).reduce(function(a,b){return a+(Number(b.amount)||0);},0);
   var out=total-reimb;
@@ -738,13 +760,29 @@ function renderExpensesInto(container){
     +expensesTable(exp);
   var ys=$('#exYear');if(ys)ys.onchange=function(){EXFY=this.value;renderFinances();};
   if(can){var nb=$('#newB');if(nb)nb.onclick=function(){openExpenseForm();};}
+  Array.prototype.forEach.call(document.querySelectorAll('.expsort'),function(th){th.onclick=function(){var k=th.getAttribute('data-es');if(EXPSORT.key===k)EXPSORT.dir*=-1;else{EXPSORT.key=k;EXPSORT.dir=(k==='date'?-1:1);}renderFinances();};});
   bindBudgetRows();bindReimburseToggles();
 }
+var EXPSORT={key:'date',dir:-1};
+function sortExpenses(list){
+  var k=EXPSORT.key,dir=EXPSORT.dir;var epById={};S.epics.forEach(function(e){epById[e.id]=e.name;});
+  function val(b){
+    if(k==='amount')return Number(b.amount)||0;
+    if(k==='category')return String(b.budget_category||'~~~').toLowerCase();
+    if(k==='item')return String(b.item||'').toLowerCase();
+    if(k==='event')return String(epById[b.epic_id]||'~~~').toLowerCase();
+    if(k==='paid')return String(b.paid_by||'~~~').toLowerCase();
+    if(k==='reimbursed')return isReimbursed(b)?1:0;
+    return String(b.date||'');
+  }
+  return list.slice().sort(function(a,b){var x=val(a),y=val(b);return x<y?-dir:x>y?dir:0;});
+}
+function expSortTh(key,label,align){var on=EXPSORT.key===key;return '<th class="expsort" data-es="'+key+'" style="cursor:pointer;user-select:none'+(align?';text-align:'+align:'')+'">'+label+(on?(EXPSORT.dir>0?' ▲':' ▼'):'')+'</th>';}
 function expensesTable(list){
   if(!list.length)return '<div class="empty">No expenses yet.'+(S.meta.canManageBudget?' Add one — you can attach a receipt.':'')+'</div>';
   var epById={};S.epics.forEach(function(e){epById[e.id]=e.name;});
   var can=S.meta.canManageBudget;
-  return '<table><thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Event</th><th style="text-align:right">Amount</th><th>Paid by</th><th>Reimbursed</th><th>Receipt</th>'+(can?'<th></th>':'')+'</tr></thead><tbody>'
+  return '<table><thead><tr>'+expSortTh('date','Date')+expSortTh('item','Item')+expSortTh('category','Category')+expSortTh('event','Event')+expSortTh('amount','Amount','right')+expSortTh('paid','Paid by')+expSortTh('reimbursed','Reimbursed')+'<th>Receipt</th>'+(can?'<th></th>':'')+'</tr></thead><tbody>'
     +list.map(function(b){
       var yes=isReimbursed(b);
       var rc=b.receipt_url?'<a href="'+esc(b.receipt_url)+'" target="_blank">view</a>':'<span class="muted">—</span>';
@@ -1046,17 +1084,20 @@ function renderEpicDetail(){
   v.innerHTML='<div class="row"><div><a id="back">← Back</a><h2 style="margin-top:6px">'+esc(e.name)+'</h2>'
     +'<div class="small muted">'+(e.program?esc(e.program)+' · ':'')+esc(e.event_date||'no date')+' · '+esc(e.status||'')+' · '+chip+(e.no_school==='yes'?' · <span class="pill p-Pending">No Sunday school</span>':'')+'</div></div>'
     +'<div class="flex">'
-    +(lead?'<button id="editE" class="sm">Edit</button><button id="cloneE" class="sm">Clone</button><button id="archE" class="sm">'+(String(e.archived||'').trim()?'Unarchive':'Archive')+'</button><button id="delE" class="sm danger">Delete</button>':'')
+    +(lead?'<button id="editE" class="sm">Edit</button><button id="flyerE" class="sm">🎨 Flyer</button><button id="cloneE" class="sm">Clone</button><button id="archE" class="sm">'+(String(e.archived||'').trim()?'Unarchive':'Archive')+'</button><button id="delE" class="sm danger">Delete</button>':'')
     +(lead&&String(e.name||'').trim().toLowerCase()==='sunday school'?'<button id="noSch" class="sm">'+(String(e.status||'').toLowerCase()==='no school'?'Mark: class is on':'Mark: no class this week')+'</button>':'')
     +'</div></div>'
     +'<div class="bar"><i style="width:'+p.pct+'%"></i></div><div class="small muted" style="margin:4px 0 16px">'+p.done+'/'+p.total+' done</div>'
     +'<div class="row"><h3>Tasks</h3><div class="flex">'+(lead?'<button class="sm" id="aiT">✨ Suggest tasks</button><button class="sm primary" id="newT">+ Add task</button>':'')+'</div></div>'
     +(ts.length?taskTable(ts,lead):'<div class="empty">No tasks yet.</div>')
-    +renderFeedbackSection(e,lead);
+    +renderFeedbackSection(e,lead)
+    +'<div id="evMedia" style="margin-top:22px"></div>';
+  renderEventMedia(e.id);
   $('#back').onclick=function(){EPIC=null;render();};
   if(lead){
     $('#editE').onclick=function(){openEpicForm(e);};
     $('#cloneE').onclick=function(){openCloneForm(e);};
+    var fl=$('#flyerE');if(fl)fl.onclick=function(){openFlyer(e);};
     $('#delE').onclick=function(){confirmDo('Delete event "'+e.name+'" and all its tasks?',function(){return api('deleteEpic',e.id);},'Event deleted',function(){EPIC=null;});};
     $('#archE').onclick=function(){var toArch=!String(e.archived||'').trim();confirmDo((toArch?'Archive':'Unarchive')+' "'+e.name+'"?',function(){return api('setEventArchived',e.id,toArch);},toArch?'Archived':'Unarchived',function(){EPIC=null;});};
     $('#newT').onclick=function(){openTaskForm(e.id);};
@@ -1240,6 +1281,57 @@ function openAssignForm(cls,d){
 }
 
 /* ------------ feedback ------------ */
+function renderEventMedia(eventId){
+  var host=$('#evMedia');if(!host)return;
+  var can=S.meta.canManageEpics||S.me.role==='teacher'||S.me.role==='co_teacher';
+  if(!can){host.innerHTML='';return;}
+  host.innerHTML='<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Photos &amp; Videos</h3><div class="flex">'
+    +'<label class="sm" style="cursor:pointer;margin:0">＋ Photos<input type="file" id="evPhotoIn" accept="image/*" multiple style="display:none"></label>'
+    +'<label class="sm" style="cursor:pointer;margin:0">＋ Videos<input type="file" id="evVideoIn" accept="video/*" multiple style="display:none"></label></div></div>'
+    +'<div id="evMediaBody"><div class="small muted">Loading…</div></div></div>';
+  var pi=$('#evPhotoIn');if(pi)pi.onchange=function(){uploadEventFiles(eventId,this.files,'Photos');};
+  var vi=$('#evVideoIn');if(vi)vi.onchange=function(){uploadEventFiles(eventId,this.files,'Videos');};
+  api('getEventMedia',eventId).then(function(m){paintEventMedia(eventId,m);}).catch(function(er){var b=$('#evMediaBody');if(b)b.innerHTML='<div class="small muted">'+esc((er&&er.message)||'Could not load')+'</div>';});
+}
+function paintEventMedia(eventId,m){
+  var b=$('#evMediaBody');if(!b)return;var ph=m.photos||[],vd=m.videos||[];var html='';
+  if(ph.length)html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:12px">'+ph.map(function(p){return '<div style="position:relative"><a href="'+p.dataUrl+'" target="_blank"><img src="'+p.dataUrl+'" style="width:100%;height:110px;object-fit:cover;border-radius:8px;display:block"></a><span data-delm="'+esc(p.id)+'" title="Delete" style="position:absolute;top:4px;right:6px;color:#fff;background:rgba(0,0,0,.55);border-radius:50%;width:20px;height:20px;text-align:center;line-height:19px;cursor:pointer">✕</span></div>';}).join('')+'</div>';
+  if(vd.length)html+='<div class="small muted" style="margin-bottom:6px">Videos</div>'+vd.map(function(v){return '<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><a data-vid="'+esc(v.id)+'" style="cursor:pointer">▶ '+esc(v.name)+'</a><span class="small muted">'+(Math.round((v.size||0)/1048576*10)/10)+' MB · <a data-delm="'+esc(v.id)+'" style="color:var(--bad);cursor:pointer">delete</a></span></div>';}).join('');
+  if(!ph.length&&!vd.length)html='<div class="empty">No media yet.</div>';
+  b.innerHTML=html+'<div id="evVidPlayer"></div>';
+  Array.prototype.forEach.call(b.querySelectorAll('[data-delm]'),function(a){a.onclick=function(){api('deleteEventMedia',eventId,a.getAttribute('data-delm')).then(function(){renderEventMedia(eventId);}).catch(apiErr);};});
+  Array.prototype.forEach.call(b.querySelectorAll('[data-vid]'),function(a){a.onclick=function(){var host=$('#evVidPlayer');host.innerHTML='<div class="small muted" style="margin-top:8px">Loading video…</div>';api('getMediaFile',a.getAttribute('data-vid')).then(function(f){host.innerHTML='<video controls src="'+f.dataUrl+'" style="width:100%;max-height:420px;margin-top:10px;border-radius:8px"></video>';}).catch(apiErr);};});
+}
+function uploadEventFiles(eventId,files,kind){
+  if(!files||!files.length)return;var arr=Array.prototype.slice.call(files),done=0,fail=0;toast('Uploading '+arr.length+' '+kind.toLowerCase()+'…');
+  arr.forEach(function(file){var r=new FileReader();r.onload=function(){api('uploadEventMedia',eventId,r.result,file.name,kind).then(function(){done++;if(done+fail===arr.length){toast(fail?('Uploaded '+done+', '+fail+' failed'):'Uploaded');renderEventMedia(eventId);}}).catch(function(e){fail++;if(done+fail===arr.length)renderEventMedia(eventId);apiErr(e);});};r.readAsDataURL(file);});
+}
+function flyerHtml(f){
+  f=f||{};var p=f.palette||{};var bg=p.bg||'#1f4d3a',ac=p.accent||'#e6b800',tx=p.text||'#ffffff';
+  return '<div class="flyerCard" style="background:'+esc(bg)+';color:'+esc(tx)+';padding:44px 34px;border-radius:14px;text-align:center;font-family:Georgia,\'Times New Roman\',serif">'
+    +'<div style="font-size:13px;letter-spacing:3px;text-transform:uppercase;color:'+esc(ac)+'">Children’s Ministry</div>'
+    +'<h1 style="font-size:38px;line-height:1.1;margin:14px 0 6px">'+esc(f.title||'')+'</h1>'
+    +(f.subtitle?'<div style="font-size:18px;opacity:.92;margin-bottom:14px">'+esc(f.subtitle)+'</div>':'')
+    +(f.dateline?'<div style="font-size:19px;font-weight:bold;color:'+esc(ac)+';margin:12px 0">'+esc(f.dateline)+(f.location?' · '+esc(f.location):'')+'</div>':'')
+    +'<div style="margin:18px auto;max-width:420px;text-align:left">'+((f.highlights||[]).map(function(h){return '<div style="padding:5px 0;font-size:16px">✦ '+esc(h)+'</div>';}).join(''))+'</div>'
+    +(f.cta?'<div style="margin-top:20px;display:inline-block;background:'+esc(ac)+';color:'+esc(bg)+';padding:12px 26px;border-radius:30px;font-weight:bold;font-size:16px">'+esc(f.cta)+'</div>':'')
+    +'</div>';
+}
+function openFlyer(e){
+  var bd=document.createElement('div');bd.className='backdrop';
+  bd.innerHTML='<div class="modal" style="max-width:560px"><h3>AI Flyer — '+esc(e.name)+'</h3>'
+    +'<div id="flyerBody"><div class="empty">Generating…</div></div>'
+    +'<label style="margin-top:10px">Tweak (optional)</label><input id="flyerExtra" placeholder="e.g. superhero theme, mention free lunch">'
+    +'<div class="actions"><button id="flyerClose">Close</button><button class="sm" id="flyerRegen">Regenerate</button><button class="primary" id="flyerPrint">Print / Save PDF</button></div></div>';
+  document.body.appendChild(bd);
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#flyerClose',bd).onclick=function(){bd.remove();};
+  var cur=null;
+  function gen(){var body=$('#flyerBody',bd);body.innerHTML='<div class="empty">Generating…</div>';var ex=$('#flyerExtra',bd);api('makeFlyer',e.id,ex?ex.value:'').then(function(f){cur=f;body.innerHTML=flyerHtml(f);}).catch(function(er){body.innerHTML='<div class="empty">'+esc((er&&er.message)||'Could not generate')+'</div>';});}
+  $('#flyerRegen',bd).onclick=gen;
+  $('#flyerPrint',bd).onclick=function(){if(!cur)return;var w=window.open('','_blank');if(!w){toast('Allow pop-ups to print');return;}w.document.write('<html><head><title>'+esc(e.name)+' — flyer</title></head><body style="margin:0;padding:26px;display:flex;justify-content:center">'+flyerHtml(cur)+'</body></html>');w.document.close();w.focus();setTimeout(function(){try{w.print();}catch(_){}}, 350);};
+  gen();
+}
 function renderFeedbackSection(e,lead){
   var fb=(S.feedback||[]).filter(function(f){return String(f.epic_id)===String(e.id);});
   var html='<div class="row" style="margin-top:22px"><h3>Feedback</h3><button class="sm" id="newF">+ Add feedback</button></div>';
