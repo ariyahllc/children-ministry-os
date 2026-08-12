@@ -1,39 +1,19 @@
-**Welcome to your Base44 project** 
+# Children's Ministry OS
 
-**About**
+Planning & operations app for the Austin Christian Fellowship of India (ACFI)
+Children's Ministry — role-based dashboards, events & tasks, calendar, children
+roster (with field-level PII protection), finances/budget, media, and the
+"Ask Dorothy" AI assistant.
 
-View and Edit  your app on [Base44.com](http://Base44.com) 
+The app is a **Google Apps Script web app** in [`apps-script-planner/`](apps-script-planner/):
 
-This project contains everything you need to run your app locally.
+- `Code.gs` — backend (auth/RBAC, CRUD, finances, media, AI)
+- `Index.html` — single-page frontend
+- `appsscript.json` — manifest
+- `DEPLOY-CLASP.md` / `SIGNIN-SETUP.md` — deploy & Google Sign-In setup
 
-**Edit the code in your local development environment**
+It runs entirely inside the `children-ministry@acfi.cc` Google account; child PII
+never leaves Google Drive. See `apps-script-planner/README.md` for details.
 
-Any change pushed to the repo will also be reflected in the Base44 Builder.
-
-**Prerequisites:** 
-
-1. Clone the repository using the project's Git URL 
-2. Navigate to the project directory
-3. Install dependencies: `npm install`
-4. Create an `.env.local` file and set the right environment variables
-
-```
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=your_backend_url
-
-e.g.
-VITE_BASE44_APP_ID=cbef744a8545c389ef439ea6
-VITE_BASE44_APP_BASE_URL=https://my-to-do-list-81bfaad7.base44.app
-```
-
-Run the app: `npm run dev`
-
-**Publish your changes**
-
-Open [Base44.com](http://Base44.com) and click on Publish.
-
-**Docs & Support**
-
-Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
-
-Support: [https://app.base44.com/support](https://app.base44.com/support)
+> The previous Base44/React prototype was removed on 2026-08-12 — it was
+> superseded by the Apps Script app and is recoverable from git history.
