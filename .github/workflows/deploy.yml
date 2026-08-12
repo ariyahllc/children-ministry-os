@@ -1,0 +1,30 @@
+name: Deploy to Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps-script-planner/**'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps-script-planner
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Authenticate clasp
+        run: printf '%s' '${{ secrets.CLASPRC_JSON }}' > "$HOME/.clasprc.json"
+
+      - name: Push code
+        run: npx @google/clasp@2.4.2 push -f
+
+      - name: Deploy (update the live deployment)
+        run: npx @google/clasp@2.4.2 deploy -i "${{ secrets.CLASP_DEPLOYMENT_ID }}" -d "CI ${GITHUB_SHA::7}"

@@ -267,17 +267,15 @@ function memberByEmail_(email) {
   return memberObj_(readTable_(TABS.MEMBERS).find(x => normEmail_(x.email) === e));
 }
 
-// Identity resolution order:
+// Identity resolution order (invite-link auth is DISABLED — Sign-In only):
 //  1. Google Sign-In session token (verified email, any account incl. Gmail)
-//  2. Invite-link token (fallback during switchover)
-//  3. @acfi.cc domain identity (auto)
+//  2. @acfi.cc domain identity (auto — owner/editor only)
 function resolveMember_(token) {
   var t = String(token || '').trim();
   var m = null;
   if (t) {
     var email = CacheService.getScriptCache().get('sess_' + t);
     if (email) m = memberByEmail_(email);
-    if (!m) m = memberByToken_(t);
   }
   if (!m) m = memberByEmail_(domainEmail_());
   return withCurrentClass_(m);
@@ -1013,116 +1011,6 @@ function deleteBudgetLine(token, id) {
   if (LEADERS.indexOf(me.role) < 0 && me.role !== 'treasurer') throw new Error('NOT_ALLOWED');
   return deleteRow_(TABS.BUDGETPLAN, id);
 }
-/** One-time: replace the non-VBS 2026 expenses with the authoritative list (dates + receipts +
- *  categories). Leaves VBS 2026 rows alone. Safe to re-run (deletes then re-inserts). */
-function reload2026Expenses() {
-  readTable_(TABS.BUDGET).forEach(function (e) {
-    if (e.category === 'income') return;
-    if (fmtDate_(e.date).slice(0, 4) !== '2026') return;
-    if (String(e.budget_category || '').trim().toLowerCase() === 'vbs') return; // keep VBS 2026
-    deleteRow_(TABS.BUDGET, e.id);
-  });
-  var rows = [ // [date, item, notes, amount, paid_by, budget_category, receipt_url]
-    ['2026-01-15', 'Regular Sunday School - GoldFish', '', 11.23, 'Dinesh', 'Gifts & Snacks', ''],
-    ['2026-01-27', 'ABC Digital subscription (Jan 2026)', 'Sunday school regular classes', 29.97, 'Dinesh', 'Children Curriculum', ''],
-    ['2026-02-27', 'ABC Digital subscription (Feb 2026)', 'Sunday school regular classes', 29.97, 'Dinesh', 'Children Curriculum', ''],
-    ['2026-01-28', 'FMSC snacks', 'Pretzel, Addictives, Veggie straws, Caprisun', 46.56, 'Dorothy', 'Gifts & Snacks', 'https://drive.google.com/file/d/1HcBRIesT2qUHnwrF0DDKtL_AOoo7r3Qu/view?usp=drive_link'],
-    ['2026-03-09', 'Compassion International gift - Birthday gift for Ana', 'Details on compassion.com', 30.00, 'Dorothy', 'Gifts & Snacks', 'https://www.compassion.com/my-account/taxes-statements.htm?Year=2026'],
-    ['2026-01-15', 'ABC Curriculum - Unit 5 (Toddler & Elementary)', '', 108.40, 'Dinesh', 'Children Curriculum', ''],
-    ['2026-03-27', 'ABC Digital subscription (Mar 2026)', 'Sunday school regular classes', 29.97, 'Dinesh', 'Children Curriculum', ''],
-    ['2026-03-04', "Children's Sunday - Trophies (40)", 'By Stacie Bosson', 378.89, 'Dorothy', "Children's Sunday", 'https://drive.google.com/file/d/1OE5JEiApQfn_zzNloOIbeWmvc26yvIeZ/view?usp=sharing'],
-    ['2026-04-26', "Children's Sunday - Gift cards (6 Chick-fil-A $10)", '', 60.00, '', "Children's Sunday", ''],
-    ['2026-04-25', "Children's Sunday - Trays (2 for trophies)", '', 14.88, 'Dorothy', "Children's Sunday", 'https://drive.google.com/file/d/1IYe8b89Nx_M7tyng-ymtVElOdLvWjVwZ/view?usp=sharing'],
-    ['2026-04-26', "Children's Sunday - Gift & books", 'For Seniors and James (Baptized)', 61.32, 'Dorothy', "Children's Sunday", 'https://drive.google.com/file/d/1f7PYgWVlCeKJBRTGx6MP1I-LXjTe3G0C/view?usp=sharing'],
-    ['2026-05-09', 'ABC Curriculum - Middle School Unit 5 Student Guides (9)', '', 52.41, 'Dorothy', 'Children Curriculum', 'https://drive.google.com/file/d/1rYrXmRv9v4jKpWlSpn3UF5LJTGUl6mQD/view?usp=drive_link'],
-    ['2026-07-22', 'ABC Curriculum - Unit 6 (Teacher kits, take-home, student guides)', 'Toddler, Elementary, Middle school', 162.62, 'Dorothy', 'Children Curriculum', 'https://drive.google.com/file/d/1Pv4VnOsClHJFdO0JAukDLdqQp4uejBHH/view?usp=sharing'],
-  ];
-  var n = 0;
-  rows.forEach(function (r) {
-    insert_(TABS.BUDGET, { id: uuid_(), epic_id: '', item: r[1], category: 'expense', amount: r[3], status: '', notes: r[2], date: r[0], paid_by: r[4], reimbursed: 'No', receipt_url: r[6], budget_category: r[5] });
-    n++;
-  });
-  return 'Reloaded ' + n + ' non-VBS 2026 expense(s).';
-}
-
-/** One-time: load the latest 2026-27 weekly action items (deduped to latest state).
- *  Skips any title already present. Bucket is visible (current-year planning). */
-function loadLatestTasks() {
-  var bucketName = 'Sunday School Planning';
-  var b = readTable_(TABS.EPICS).find(function (e) { return String(e.name).trim().toLowerCase() === bucketName.toLowerCase(); });
-  var bid = b ? b.id : null;
-  if (!bid) { bid = uuid_(); insert_(TABS.EPICS, { id: bid, name: bucketName, type: '', event_date: '', status: '', notes: 'Generic ongoing CM planning tasks', program: "Children's Ministry", archived: '', no_school: '' }); }
-  function norm(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); }
-  var seen = {}; readTable_(TABS.TASKS).forEach(function (t) { seen[norm(t.title)] = true; });
-  var rows = [ // [title, owner, status, notes]
-    ['Email brother Daniel re expense sheets / reimbursements from Jan 2026', 'Dinesh', 'Completed', ''],
-    ['VBS - check with IBC for pictures and YouTube link', 'Dorothy', 'Completed', ''],
-    ['Call ABC to correct Unit/lesson numbers to align to our schedule', 'Dorothy', 'In Progress', ''],
-    ['Email board: begin academic year with registered kids count, teacher/co-teacher list, links to sheets & calendar', 'Dorothy', 'Completed', ''],
-    ['Email Pastor: Board said no Child Protection Training needed for CM (small church)', 'Dinesh', 'Pending', ''],
-    ['Send CFC expenses to Shirisha, cc CFC co-ordinators', 'Dinesh', 'Pending', ''],
-    ['Mission trip - Stella & Naga email board with budget (cc CM); Naga cost per person', 'Dorothy', 'Completed', 'Stella sent report Sat Aug 1'],
-    ['Talk to Neil about Sunday school plans; session with Ps Vinod', 'Dorothy', 'Completed', 'Neil wants a break this academic year; will connect with Pastor'],
-    ['Move Abi & John to 2026 semester, move Stella to 2027', 'Dinesh', 'Completed', ''],
-    ['Calendar of events updated and synced across the 2 sheets', 'Dorothy', 'Completed', ''],
-    ['Teachers Orientation - plan workshop details, send Pastor the time schedule', 'Everyone', 'Completed', ''],
-    ['Find Teachers and volunteers for Sunday school 2026-27', 'Everyone', 'In Progress', 'Middle School & Elementary - check Deepa Fenil, Susan, Preeti'],
-    ['Update expenses and Offertory for last few Sundays', 'Dorothy', 'In Progress', 'Check missing dates, else check with Daniel'],
-    ['Create new Expense sheet for 2026 and move from old', 'Dinesh', 'Pending', ''],
-    ['Adjust attendance sheet to sync with student list', 'Dinesh', 'Completed', ''],
-    ['Discipleship Program - meeting with Sirisha & Ps Vinod to kick start', 'Dinesh', 'In Progress', ''],
-    ['Meeting with Pastor & Shirisha: Discipleship, Back to School Sunday, kids singing, CPP reminder', 'Everyone', 'Completed', ''],
-    ["Respond to brother Josh's email re AWANA (cubbies, sparks, T&T)", 'Everyone', 'Completed', 'Bring up in Ministry Leaders Retreat'],
-    ['Back to School Sunday - message teachers: no Sunday school except Toddlers', 'Dinesh', 'Completed', ''],
-    ['Orientation Workshop - send email to Board', 'Dorothy', 'Completed', ''],
-    ['Mission trip - remind Naga to send expenses and cost per person', 'Dinesh', 'In Progress', ''],
-    ["Mission trip - respond to Stella's report email", 'Dorothy', 'Completed', ''],
-    ["Mission trip - request video of participants' experiences to play in church", 'Dorothy', 'Completed', ''],
-    ['Offertory songs - email minutes of meeting to everyone', 'Dinesh', 'Completed', 'Pastor to find practice resource person'],
-    ['Discipleship mentors - send list to Pastor', 'Dorothy', 'Completed', 'Suja, Mukta, Srini, Charles, Josh David, Amuthan, Dorothy, Abi, Vinod, Angel, Shobha, Marlyn, Daniel Pabbathi'],
-    ["Announcement for Teacher's Orientation", 'Dorothy', 'Completed', ''],
-    ['Make flyer for Teachers Orientation', 'Dinesh', 'Completed', ''],
-    ['Raise "announcing correctly" with Pastor (esp Vijay Raj) - slides missed ~6 times', 'Dorothy', 'Completed', ''],
-    ['Send Orientation Workshop schedule to Pastor, Board, Shirisha', 'Dorothy', 'Completed', ''],
-    ['Slide completed for Ministry Leaders Retreat', 'Dinesh', 'Completed', 'https://docs.google.com/presentation/d/1ErQNo3zNSyApbrrNLpEsxOrbNcVvy2nOZxiz1rG5dwk/edit'],
-    ['Offertory song (High School) - Sunny to coordinate', 'Dorothy', 'In Progress', 'First HS meeting done Sun Aug 9; practice via HS WhatsApp'],
-    ['Offertory song (Middle School) - Sunny to coordinate; message MS parents', 'Dorothy', 'Pending', ''],
-    ['Teachers Orientation - send flyer, invite discipleship volunteers, finalize food/paperware/items', 'Everyone', 'Pending', 'Flyer sent on Teacher\'s group'],
-    ['Discipleship mentors - talk to potential disciplers for willingness/commitment', 'Everyone', 'Pending', 'Madhu, Dinesh, Sinty, Bhavika, Sunny, Swati, Mukta, Amuthan, Sreenivas, Shobha, Charles, Dorothy, Suja, Josh, Abi, Vinod, Angel, Marlyn, Daniel'],
-    ['Try out CM Planner app regularly for Children\'s Ministry', 'Everyone', 'Pending', ''],
-    ['Take plastic boxes to church for CM storage', 'Dorothy', 'Pending', ''],
-    ['Buy pretzels for Anu (milk allergy)', 'Dinesh', 'Pending', ''],
-    ['Outreach events - Kavya, Stella to explore', 'Dorothy', 'Pending', ''],
-    ['Get Back to School Sunday pictures from Raj; request parents to share', 'Dinesh', 'Pending', ''],
-    ['Get Back to School Sunday pictures from parents to CM drive', 'Dorothy', 'Completed', ''],
-    ['Informal get-together with Teachers/Co-teachers - games & potluck', 'Dorothy', 'Pending', ''],
-    ['Pray, identify and train next CM leaders', 'Everyone', 'Pending', 'Request Pastor to encourage them'],
-  ];
-  var n = 0;
-  rows.forEach(function (r) {
-    var k = norm(r[0]); if (seen[k]) return; seen[k] = true;
-    insert_(TABS.TASKS, { id: uuid_(), epic_id: bid, title: r[0], owner: r[1], due_offset: '', due_date: '', status: r[2] || 'Pending', priority: 'Medium', notes: r[3] || '' });
-    n++;
-  });
-  return 'Added ' + n + ' of ' + rows.length + ' task(s) under ' + bucketName + '.';
-}
-
-/** One-time: move every task under "Children's Ministry — Planning 2026-27" (or similar
- *  stray planning events) into "Sunday School Planning", then delete the empty event(s). */
-function mergePlanningIntoSundaySchool() {
-  var epics = readTable_(TABS.EPICS);
-  var dest = epics.find(function (e) { return String(e.name).trim().toLowerCase() === 'sunday school planning'; });
-  var did = dest ? dest.id : uuid_();
-  if (!dest) insert_(TABS.EPICS, { id: did, name: 'Sunday School Planning', type: '', event_date: '', status: '', notes: 'Generic ongoing CM planning tasks', program: "Children's Ministry", archived: '', no_school: '' });
-  var src = epics.filter(function (e) { return /children'?s ministry\s*[—-]\s*planning/i.test(String(e.name || '')); });
-  var moved = 0;
-  src.forEach(function (s) {
-    readTable_(TABS.TASKS).filter(function (t) { return String(t.epic_id) === String(s.id); }).forEach(function (t) { updateRow_(TABS.TASKS, t.id, { epic_id: did }); moved++; });
-    deleteRow_(TABS.EPICS, s.id);
-  });
-  return 'Moved ' + moved + ' task(s) to Sunday School Planning; removed ' + src.length + ' stray planning event(s).';
-}
-
 function deleteBudget(token, id) {
   const me = requireMember_(token);
   if (LEADERS.indexOf(me.role) < 0 && me.role !== 'treasurer') throw new Error('NOT_ALLOWED');
@@ -1239,15 +1127,39 @@ function deleteEventMedia(token, eventId, fileId) {
 }
 
 // AI flyer copy from event logistics only (no PII) -> the client renders it into a template.
+var DEFAULT_FLYER_PROMPT = "Write the COPY for an Austin Christian Fellowship of India (ACFI) Children's Ministry event flyer. "
+  + "Every flyer must clearly answer WHAT (the event and why to come), WHEN (date and time), and WHERE (venue).\n"
+  + "Rules:\n"
+  + "- title: punchy, max 6 words, names the event.\n"
+  + "- subtitle: one short line on what it is / who it's for.\n"
+  + "- dateline (the WHEN): spell the month; include the time ONLY if it is in the notes; never invent a time.\n"
+  + "- location (the WHERE): only if a venue is named in the notes; otherwise \"\".\n"
+  + "- highlights: 3-4 short phrases covering WHAT to expect — activities, purpose, or what to bring.\n"
+  + "- speaker + org: only if the notes name a guest speaker; never describe their appearance; otherwise \"\".\n"
+  + "- cta: short call to action (e.g. 'All families welcome').\n"
+  + "Tone: warm, family-friendly, faith-centered. Do NOT invent any fact, venue, time, or speaker. No image descriptions.";
 function makeFlyer(token, eventId, extra) {
   requireLeader_(token);
   var ev = eventById_(eventId); if (!ev) throw new Error('Event not found');
-  var prompt = 'Design copy for a warm, family-friendly church Children\'s Ministry event flyer. '
-    + 'Return ONLY JSON: {"title":"","subtitle":"","dateline":"","location":"","highlights":["",""],"cta":"","palette":{"bg":"#hex","accent":"#hex","text":"#hex"}}. '
-    + 'Rules: title punchy (max 6 words); 3-4 short highlight phrases; dateline derived from the event date (spell the month); pick a tasteful palette (dark bg, bright accent, readable text); cta is a short call to action. '
+  // Editable without code: set Script Property FLYER_PROMPT to change tone/rules. The JSON
+  // schema line below is always appended in code so the response stays parseable.
+  var guide = PropertiesService.getScriptProperties().getProperty('FLYER_PROMPT') || DEFAULT_FLYER_PROMPT;
+  var prompt = guide + '\n'
+    + 'Return ONLY JSON with these keys: {"title":"","subtitle":"","dateline":"","location":"","speaker":"","org":"","highlights":["",""],"cta":""}.\n'
     + 'EVENT: ' + JSON.stringify({ name: ev.name, date: fmtDate_(ev.event_date), program: ev.program, notes: ev.notes })
     + (extra ? ('\nEXTRA INSTRUCTIONS: ' + String(extra).slice(0, 300)) : '');
-  return callGemini_(prompt, 0.7);
+  var f = callGemini_(prompt, 0.6);
+  f.banner = flyerBannerDataUrl_(); // embed so the client can export a clean PNG (no CORS taint)
+  return f;
+}
+function flyerBannerDataUrl_() {
+  var props = PropertiesService.getScriptProperties();
+  var cached = props.getProperty('FLYER_BANNER_DATA'); if (cached) return cached;
+  try {
+    var res = UrlFetchApp.fetch('https://www.acfi.cc/wp-content/uploads/2018/08/ACFI_Banner2.png', { muteHttpExceptions: true });
+    if (res.getResponseCode() === 200) { var b = res.getBlob(); var d = 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes()); props.setProperty('FLYER_BANNER_DATA', d); return d; }
+  } catch (e) {}
+  return '';
 }
 function saveFeedback(token, data) {
   requireMember_(token);
