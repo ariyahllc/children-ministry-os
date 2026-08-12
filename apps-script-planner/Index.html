@@ -1231,15 +1231,11 @@ function renderMembers(){
   var list=MEMFILTER?S.members.filter(function(m){return String(m.class||'')===MEMFILTER;}):S.members;
   v.innerHTML='<div class="row"><h2>Members</h2><div class="flex">'+memSeg_()+filter+(manage?'<button class="primary" id="newM">+ Add member</button>':'')+'</div></div>'
    +(manage?'<p class="small muted">Members sign in with Google using the email listed here. Add an email + role (and a class for teachers) to grant access; remove the row to revoke.</p>':'<p class="small muted">Read-only view of the team and their roles.</p>')
-   +'<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Class</th>'+(manage?'<th>Invite link</th><th></th>':'')+'</tr></thead><tbody>'
+   +'<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Class</th>'+(manage?'<th></th>':'')+'</tr></thead><tbody>'
    +list.map(function(m){
-      var invite=m.link
-        ? '<a data-cp="'+esc(m.link)+'">Copy link</a> · <a data-rg="'+esc(m.email)+'" class="muted">reset</a>'
-        : '<span class="muted">—</span>';
       return '<tr><td>'+esc(m.name)+'</td><td class="small">'+esc(m.email)+'</td><td><span class="chip">'+esc(roleLabel(m.role))+'</span></td>'
        +'<td class="small">'+(m.class?'<span class="chip">'+esc(m.class)+'</span>':'<span class="muted">—</span>')+'</td>'
-       +(manage?'<td class="small">'+invite+'</td>'
-         +'<td class="small nowrap"><a data-me="'+esc(m.email)+'">Edit</a> · <a data-md="'+esc(m.email)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';}).join('')
+       +(manage?'<td class="small nowrap"><a data-me="'+esc(m.email)+'">Edit</a> · <a data-md="'+esc(m.email)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';}).join('')
    +'</tbody></table>';
   var mf=$('#mFilter');if(mf)mf.onchange=function(){MEMFILTER=this.value;renderMembers();};
   var nm=$('#newM');if(nm)nm.onclick=function(){openMemberForm();};
@@ -1314,29 +1310,60 @@ function uploadEventFiles(eventId,files,kind){
   if(!files||!files.length)return;var arr=Array.prototype.slice.call(files),done=0,fail=0;toast('Uploading '+arr.length+' '+kind.toLowerCase()+'…');
   arr.forEach(function(file){var r=new FileReader();r.onload=function(){api('uploadEventMedia',eventId,r.result,file.name,kind).then(function(){done++;if(done+fail===arr.length){toast(fail?('Uploaded '+done+', '+fail+' failed'):'Uploaded');loadEventMediaNow(eventId);}}).catch(function(e){fail++;if(done+fail===arr.length)loadEventMediaNow(eventId);apiErr(e);});};r.readAsDataURL(file);});
 }
+var ACFI_BANNER='https://www.acfi.cc/wp-content/uploads/2018/08/ACFI_Banner2.png';
 function flyerHtml(f){
-  f=f||{};var p=f.palette||{};var bg=p.bg||'#1f4d3a',ac=p.accent||'#e6b800',tx=p.text||'#ffffff';
-  return '<div class="flyerCard" style="background:'+esc(bg)+';color:'+esc(tx)+';padding:44px 34px;border-radius:14px;text-align:center;font-family:Georgia,\'Times New Roman\',serif">'
-    +'<div style="font-size:13px;letter-spacing:3px;text-transform:uppercase;color:'+esc(ac)+'">Children’s Ministry</div>'
-    +'<h1 style="font-size:38px;line-height:1.1;margin:14px 0 6px">'+esc(f.title||'')+'</h1>'
-    +(f.subtitle?'<div style="font-size:18px;opacity:.92;margin-bottom:14px">'+esc(f.subtitle)+'</div>':'')
-    +(f.dateline?'<div style="font-size:19px;font-weight:bold;color:'+esc(ac)+';margin:12px 0">'+esc(f.dateline)+(f.location?' · '+esc(f.location):'')+'</div>':'')
-    +'<div style="margin:18px auto;max-width:420px;text-align:left">'+((f.highlights||[]).map(function(h){return '<div style="padding:5px 0;font-size:16px">✦ '+esc(h)+'</div>';}).join(''))+'</div>'
-    +(f.cta?'<div style="margin-top:20px;display:inline-block;background:'+esc(ac)+';color:'+esc(bg)+';padding:12px 26px;border-radius:30px;font-weight:bold;font-size:16px">'+esc(f.cta)+'</div>':'')
+  f=f||{};var BLUE='#1b6cb0',YEL='#f7a81b',INK='#1f2937';var FONT="'Helvetica Neue',Arial,sans-serif";
+  var speaker=f.speaker?('<div style="margin:14px 0"><div style="font-size:20px;font-weight:bold;color:'+INK+'">'+esc(f.speaker)+'</div>'+(f.org?'<div style="font-size:15px;color:#556">'+esc(f.org)+'</div>':'')+'</div>'):'';
+  var banner=f.banner||ACFI_BANNER;
+  return '<div class="flyerCard" style="background:#fff;color:'+INK+';font-family:'+FONT+';border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">'
+    +'<img src="'+banner+'" alt="ACFI" style="width:100%;display:block">'
+    +'<div style="height:6px;background:'+YEL+'"></div>'
+    +'<div style="padding:30px 34px 26px;text-align:center">'
+      +'<h1 style="color:'+BLUE+';font-size:32px;line-height:1.12;margin:2px 0 8px">'+esc(f.title||'')+'</h1>'
+      +(f.subtitle?'<div style="font-size:17px;color:#556;margin-bottom:14px">'+esc(f.subtitle)+'</div>':'')
+      +'<div style="display:flex;justify-content:center;gap:34px;flex-wrap:wrap;margin:14px 0 4px">'
+        +(f.dateline?'<div><div style="font-size:11px;letter-spacing:1.5px;color:'+YEL+';font-weight:bold">WHEN</div><div style="font-size:16px;font-weight:bold">'+esc(f.dateline)+'</div></div>':'')
+        +(f.location?'<div><div style="font-size:11px;letter-spacing:1.5px;color:'+YEL+';font-weight:bold">WHERE</div><div style="font-size:16px;font-weight:bold">'+esc(f.location)+'</div></div>':'')
+      +'</div>'
+      +speaker
+      +((f.highlights&&f.highlights.length)?'<div style="font-size:11px;letter-spacing:1.5px;color:'+YEL+';font-weight:bold;margin-top:16px">WHAT TO EXPECT</div><div style="margin:6px auto 0;max-width:420px;text-align:left">'+f.highlights.map(function(h){return '<div style="padding:5px 0;font-size:16px"><span style="color:'+YEL+'">✦</span> '+esc(h)+'</div>';}).join('')+'</div>':'')
+      +(f.cta?'<div style="margin-top:18px;display:inline-block;background:'+BLUE+';color:#fff;padding:12px 26px;border-radius:30px;font-weight:bold;font-size:16px">'+esc(f.cta)+'</div>':'')
+    +'</div>'
+    +'<div style="background:'+BLUE+';color:#fff;padding:12px 16px;text-align:center;font-size:13px">Contact: <b>Dorothy / Dinesh</b> for more information &nbsp;·&nbsp; <a href="https://acfi.cc" style="color:'+YEL+';text-decoration:none">acfi.cc</a></div>'
     +'</div>';
+}
+function downloadFlyerHtml(f,name){
+  var html='<!doctype html><meta charset="utf-8"><body style="margin:0;display:flex;justify-content:center;padding:20px">'+flyerHtml(f)+'</body>';
+  var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([html],{type:'text/html'}));a.download=(name||'flyer').replace(/[^\w-]+/g,'_')+'.html';a.click();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},1500);toast('Downloaded (HTML)');
+}
+function downloadFlyer(f,name){
+  var W=640;
+  var probe=document.createElement('div');probe.style.cssText='position:fixed;left:-9999px;top:0;width:'+W+'px';probe.innerHTML=flyerHtml(f);document.body.appendChild(probe);
+  var H=probe.offsetHeight||900;document.body.removeChild(probe);
+  // make markup XML-safe for foreignObject (self-close void tags, fix entities)
+  var xhtml=flyerHtml(f).replace(/<img([^>]*?)\/?>/g,'<img$1/>').replace(/<br\s*\/?>/g,'<br/>').replace(/&nbsp;/g,' ');
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+W+'" height="'+H+'"><foreignObject width="100%" height="100%"><div xmlns="http://www.w3.org/1999/xhtml" style="width:'+W+'px">'+xhtml+'</div></foreignObject></svg>';
+  var url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));var img=new Image();
+  img.onload=function(){try{var c=document.createElement('canvas');c.width=W*2;c.height=H*2;var ctx=c.getContext('2d');ctx.setTransform(2,0,0,2,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);ctx.drawImage(img,0,0);URL.revokeObjectURL(url);
+    c.toBlob(function(blob){if(!blob){downloadFlyerHtml(f,name);return;}var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(name||'flyer').replace(/[^\w-]+/g,'_')+'.png';a.click();setTimeout(function(){URL.revokeObjectURL(a.href);},1500);toast('Downloaded PNG');},'image/png');
+  }catch(err){URL.revokeObjectURL(url);downloadFlyerHtml(f,name);}};
+  img.onerror=function(){URL.revokeObjectURL(url);downloadFlyerHtml(f,name);};
+  img.src=url;
 }
 function openFlyer(e){
   var bd=document.createElement('div');bd.className='backdrop';
   bd.innerHTML='<div class="modal" style="max-width:560px"><h3>AI Flyer — '+esc(e.name)+'</h3>'
     +'<div id="flyerBody"><div class="empty">Generating…</div></div>'
     +'<label style="margin-top:10px">Tweak (optional)</label><input id="flyerExtra" placeholder="e.g. superhero theme, mention free lunch">'
-    +'<div class="actions"><button id="flyerClose">Close</button><button class="sm" id="flyerRegen">Regenerate</button><button class="primary" id="flyerPrint">Print / Save PDF</button></div></div>';
+    +'<div class="actions"><button id="flyerClose">Close</button><button class="sm" id="flyerRegen">Regenerate</button><button class="sm" id="flyerDl">⬇ Download PNG</button><button class="primary" id="flyerPrint">Print / Save PDF</button></div></div>';
   document.body.appendChild(bd);
   bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
   $('#flyerClose',bd).onclick=function(){bd.remove();};
   var cur=null;
   function gen(){var body=$('#flyerBody',bd);body.innerHTML='<div class="empty">Generating…</div>';var ex=$('#flyerExtra',bd);api('makeFlyer',e.id,ex?ex.value:'').then(function(f){cur=f;body.innerHTML=flyerHtml(f);}).catch(function(er){body.innerHTML='<div class="empty">'+esc((er&&er.message)||'Could not generate')+'</div>';});}
   $('#flyerRegen',bd).onclick=gen;
+  $('#flyerDl',bd).onclick=function(){if(!cur)return;downloadFlyer(cur,e.name);};
   $('#flyerPrint',bd).onclick=function(){if(!cur)return;var w=window.open('','_blank');if(!w){toast('Allow pop-ups to print');return;}w.document.write('<html><head><title>'+esc(e.name)+' — flyer</title></head><body style="margin:0;padding:26px;display:flex;justify-content:center">'+flyerHtml(cur)+'</body></html>');w.document.close();w.focus();setTimeout(function(){try{w.print();}catch(_){}}, 350);};
   gen();
 }
