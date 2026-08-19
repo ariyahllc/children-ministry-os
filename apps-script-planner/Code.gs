@@ -1135,6 +1135,15 @@ function authorizeForms() {
   try { DriveApp.getFileById(f.getId()).setTrashed(true); } catch (e) {}
   return 'Forms access authorized.';
 }
+// TEMP validation: creates a form on the first dated event and logs the URLs. Delete after.
+function testForms_() {
+  var ev = readTable_(TABS.EPICS).filter(function (e) { return String(e.archived || '').trim() === '' && e.event_date; })[0];
+  if (!ev) return 'no dated event to test on';
+  var r = createEventForm('', ev.id, 'TEST — Registration form (safe to delete)');
+  var list = getEventForms('', ev.id);
+  Logger.log('EVENT: ' + ev.name + '\n\nCREATED:\n' + JSON.stringify(r, null, 2) + '\n\ngetEventForms LIST:\n' + JSON.stringify(list, null, 2));
+  return r;
+}
 function createEventForm(token, eventId, title) {
   requireLeader_(token);
   var ev = eventById_(eventId); if (!ev) throw new Error('Event not found');
