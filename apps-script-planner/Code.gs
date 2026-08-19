@@ -1136,7 +1136,7 @@ function authorizeForms() {
   return 'Forms access authorized.';
 }
 // TEMP validation: creates a form on the first dated event and logs the URLs. Delete after.
-function testForms_() {
+function runFormsTest() {
   var ev = readTable_(TABS.EPICS).filter(function (e) { return String(e.archived || '').trim() === '' && e.event_date; })[0];
   if (!ev) return 'no dated event to test on';
   var r = createEventForm('', ev.id, 'TEST — Registration form (safe to delete)');
