@@ -30,6 +30,7 @@ const TABS = {
   ANNOUNCEMENTS: 'Announcements',
   LESSONS: 'Lessons',
   BUDGETPLAN: 'Budgets',
+  FORMS: 'Forms',
 };
 
 const SCHEMA = {
@@ -38,6 +39,7 @@ const SCHEMA = {
   Tasks:    ['id', 'epic_id', 'title', 'owner', 'due_offset', 'due_date', 'status', 'priority', 'notes'],
   Expenses: ['id', 'epic_id', 'item', 'category', 'amount', 'status', 'notes', 'date', 'paid_by', 'reimbursed', 'receipt_url', 'budget_category'],
   Budgets: ['id', 'fy', 'category', 'amount', 'notes'],
+  Forms: ['id', 'epic_id', 'title', 'published_url', 'edit_url', 'sheet_url', 'created'],
   Feedback: ['id', 'epic_id', 'text', 'converted', 'converted_task_id'],
   // Column A is id (backfilled); columns B..N match the user's Children list; class is last.
   Children: ['id', 'name', 'age', 'grade', 'dob', 'father_name', 'father_contact', 'father_email',
@@ -1123,6 +1125,54 @@ function uploadEventMedia(token, eventId, dataUrl, filename, kind) {
 function deleteEventMedia(token, eventId, fileId) {
   var me = requireMember_(token); if (!canUseEventMedia_(me)) throw new Error('NOT_ALLOWED');
   try { DriveApp.getFileById(fileId).setTrashed(true); } catch (e) {}
+  return { ok: true };
+}
+
+/* ---- registration forms: a real Google Form per event, its own response Sheet, both in Drive ---- */
+// Run ONCE from the editor after adding the Forms scope, to grant it (owner consent).
+function authorizeForms() {
+  var f = FormApp.create('__auth_check__ (safe to delete)');
+  try { DriveApp.getFileById(f.getId()).setTrashed(true); } catch (e) {}
+  return 'Forms access authorized.';
+}
+function createEventForm(token, eventId, title) {
+  requireLeader_(token);
+  var ev = eventById_(eventId); if (!ev) throw new Error('Event not found');
+  title = String(title || '').trim() || ('Registration — ' + ev.name);
+  var form = FormApp.create(title);
+  form.setDescription('Registration for ' + ev.name + (ev.event_date ? ' (' + fmtDate_(ev.event_date) + ')' : '') + '.');
+  form.setCollectEmail(false);
+  try { form.setRequireLogin(false); } catch (e) {} // public: no Google account needed to submit
+  form.addTextItem().setTitle("Child's full name").setRequired(true);
+  form.addTextItem().setTitle('Parent / guardian name').setRequired(true);
+  form.addTextItem().setTitle('Parent contact number').setRequired(true);
+  form.addTextItem().setTitle('Parent email');
+  form.addTextItem().setTitle("Child's age / grade");
+  form.addParagraphTextItem().setTitle('Allergies or medical notes');
+  form.addParagraphTextItem().setTitle('Comments');
+  var ss = SpreadsheetApp.create(title + ' (Responses)');
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+  var folder = mediaFolder_(['Forms']);
+  try { DriveApp.getFileById(form.getId()).moveTo(folder); } catch (e) {}
+  try { DriveApp.getFileById(ss.getId()).moveTo(folder); } catch (e) {}
+  var row = { id: uuid_(), epic_id: eventId, title: title, published_url: form.getPublishedUrl(), edit_url: form.getEditUrl(), sheet_url: ss.getUrl(), created: fmtDate_(new Date()) };
+  insert_(TABS.FORMS, row);
+  return row;
+}
+function getEventForms(token, eventId) {
+  var me = requireMember_(token);
+  if (LEADERS.indexOf(me.role) < 0 && DOERS.indexOf(me.role) < 0) throw new Error('NOT_ALLOWED');
+  // cheap: just the stored links (no FormApp open). Response counts live in the linked sheet.
+  return readTable_(TABS.FORMS).filter(function (f) { return String(f.epic_id) === String(eventId); })
+    .map(function (f) { return { id: f.id, title: f.title, published_url: f.published_url, edit_url: f.edit_url, sheet_url: f.sheet_url, created: fmtDate_(f.created) }; });
+}
+function deleteEventForm(token, formId) {
+  requireLeader_(token);
+  var f = readTable_(TABS.FORMS).find(function (x) { return String(x.id) === String(formId); });
+  if (f) {
+    [f.edit_url, f.sheet_url].forEach(function (u) { try { var id = String(u).match(/[-\w]{25,}/); if (id) DriveApp.getFileById(id[0]).setTrashed(true); } catch (e) {} });
+    deleteRow_(TABS.FORMS, formId);
+  }
   return { ok: true };
 }
 

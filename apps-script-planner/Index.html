@@ -1095,8 +1095,10 @@ function renderEpicDetail(){
     +'<div class="row"><h3>Tasks</h3><div class="flex">'+(lead?'<button class="sm" id="aiT">✨ Suggest tasks</button><button class="sm primary" id="newT">+ Add task</button>':'')+'</div></div>'
     +(ts.length?taskTable(ts,lead):'<div class="empty">No tasks yet.</div>')
     +renderFeedbackSection(e,lead)
-    +'<div id="evMedia" style="margin-top:22px"></div>';
+    +'<div id="evMedia" style="margin-top:22px"></div>'
+    +'<div id="evForms" style="margin-top:22px"></div>';
   renderEventMedia(e.id);
+  renderEventForms(e.id);
   $('#back').onclick=function(){EPIC=null;render();};
   if(lead){
     $('#editE').onclick=function(){openEpicForm(e);};
@@ -1281,6 +1283,28 @@ function openAssignForm(cls,d){
 }
 
 /* ------------ feedback ------------ */
+function renderEventForms(eventId){
+  var host=$('#evForms');if(!host)return;
+  var canView=S.meta.canManageEpics||S.me.role==='teacher'||S.me.role==='co_teacher';
+  if(!canView){host.innerHTML='';return;}
+  var canManage=S.meta.canManageEpics;
+  host.innerHTML='<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Registration forms</h3>'+(canManage?'<button class="sm" id="newForm">＋ Create form</button>':'')+'</div><div id="evFormsBody"><div class="small muted">Loading…</div></div></div>';
+  var nf=$('#newForm');if(nf)nf.onclick=function(){createFormPrompt(eventId);};
+  api('getEventForms',eventId).then(function(list){paintForms(eventId,list,canManage);}).catch(function(e){var b=$('#evFormsBody');if(b)b.innerHTML='<div class="small muted">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function paintForms(eventId,list,canManage){
+  var b=$('#evFormsBody');if(!b)return;
+  if(!list.length){b.innerHTML='<div class="empty">No forms yet.'+(canManage?' Create a registration form — it makes a Google Form + its own responses sheet in Drive.':'')+'</div>';return;}
+  b.innerHTML=list.map(function(f){return '<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)"><div><b>'+esc(f.title)+'</b><div class="small"><a href="'+esc(f.published_url)+'" target="_blank">Open form</a> · <a href="'+esc(f.edit_url)+'" target="_blank">Edit questions</a> · <a href="'+esc(f.sheet_url)+'" target="_blank">Responses</a>'+(f.published_url?' · <a data-cpf="'+esc(f.published_url)+'" style="cursor:pointer">Copy link</a>':'')+'</div></div>'+(canManage?'<a data-delform="'+esc(f.id)+'" style="color:var(--bad);cursor:pointer" class="small nowrap">Delete</a>':'')+'</div>';}).join('');
+  Array.prototype.forEach.call(b.querySelectorAll('[data-cpf]'),function(a){a.onclick=function(){copyText(a.getAttribute('data-cpf'));toast('Form link copied');};});
+  if(canManage)Array.prototype.forEach.call(b.querySelectorAll('[data-delform]'),function(a){a.onclick=function(){confirmDo('Delete this form and its responses? This cannot be undone.',function(){return api('deleteEventForm',a.getAttribute('data-delform'));},'Deleted',function(){renderEventForms(eventId);});};});
+}
+function createFormPrompt(eventId){
+  modal('Create registration form',[{name:'title',label:'Form title',hint:'blank = "Registration — <event name>"',value:''}],function(out){
+    toast('Creating form…');
+    return api('createEventForm',eventId,out.title).then(function(){toast('Form created');renderEventForms(eventId);});
+  });
+}
 function renderEventMedia(eventId){
   var host=$('#evMedia');if(!host)return;
   var can=S.meta.canManageEpics||S.me.role==='teacher'||S.me.role==='co_teacher';
