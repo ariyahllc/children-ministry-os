@@ -21,7 +21,11 @@ jobs:
           node-version: '24'
 
       - name: Authenticate clasp
-        run: printf '%s' '${{ secrets.CLASPRC_JSON }}' > "$HOME/.clasprc.json"
+        # --creds tokens are "local" format; clasp reads ./.clasprc.json in the project dir.
+        # Write to both the project dir (working-directory) and $HOME to be safe.
+        run: |
+          printf '%s' '${{ secrets.CLASPRC_JSON }}' > .clasprc.json
+          printf '%s' '${{ secrets.CLASPRC_JSON }}' > "$HOME/.clasprc.json"
 
       - name: Push code
         run: npx @google/clasp@2.4.2 push -f
