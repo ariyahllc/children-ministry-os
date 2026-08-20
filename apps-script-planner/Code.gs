@@ -31,15 +31,17 @@ const TABS = {
   LESSONS: 'Lessons',
   BUDGETPLAN: 'Budgets',
   FORMS: 'Forms',
+  TIMEOFF: 'TimeOff',
 };
 
 const SCHEMA = {
-  Members:  ['email', 'name', 'role', 'token', 'class', 'availability', 'avail_note'],
+  Members:  ['email', 'name', 'role', 'token', 'class'],
   Events:   ['id', 'name', 'type', 'event_date', 'status', 'notes', 'program', 'archived', 'no_school'],
   Tasks:    ['id', 'epic_id', 'title', 'owner', 'due_offset', 'due_date', 'status', 'priority', 'notes'],
   Expenses: ['id', 'epic_id', 'item', 'category', 'amount', 'status', 'notes', 'date', 'paid_by', 'reimbursed', 'receipt_url', 'budget_category'],
   Budgets: ['id', 'fy', 'category', 'amount', 'notes'],
   Forms: ['id', 'epic_id', 'title', 'published_url', 'edit_url', 'sheet_url', 'created'],
+  TimeOff: ['id', 'member', 'start', 'end', 'note'],
   Feedback: ['id', 'epic_id', 'text', 'converted', 'converted_task_id'],
   // Column A is id (backfilled); columns B..N match the user's Children list; class is last.
   Children: ['id', 'name', 'age', 'grade', 'dob', 'father_name', 'father_contact', 'father_email',
@@ -501,16 +503,15 @@ function getBootstrap(token) {
   const isObserver = OBSERVERS.indexOf(me.role) >= 0;
   const members = (me.role === 'admin') ? memberRows.map(m => ({
     email: m.email, name: m.name, role: m.role, class: m['class'] || '',
-    availability: m.availability || '', avail_note: m.avail_note || '',
     token: m.token || '', link: (webBase && m.token) ? (webBase + '?k=' + encodeURIComponent(m.token)) : '',
   })) : isObserver ? memberRows.map(m => ({ // board rep: read-only, no tokens/links
-    email: m.email, name: m.name, role: m.role, class: m['class'] || '',
-    availability: m.availability || '', avail_note: m.avail_note || '', token: '', link: '',
+    email: m.email, name: m.name, role: m.role, class: m['class'] || '', token: '', link: '',
   })) : [];
   const showBudget = LEADERS.indexOf(me.role) >= 0 || me.role === 'treasurer' || OBSERVERS.indexOf(me.role) >= 0;
   const budget = showBudget ? readTable_(TABS.BUDGET).map(sanitizeRow_) : [];
   const budgetPlan = showBudget ? readTable_(TABS.BUDGETPLAN).map(sanitizeRow_) : [];
   const formCounts = {}; readTable_(TABS.FORMS).forEach(function (f) { formCounts[f.epic_id] = (formCounts[f.epic_id] || 0) + 1; });
+  const timeoff = readTable_(TABS.TIMEOFF).map(r => ({ id: r.id, member: r.member, start: fmtDate_(r.start), end: fmtDate_(r.end), note: r.note || '' }));
   const feedback = readTable_(TABS.FEEDBACK).map(sanitizeRow_);
 
   return {
@@ -523,6 +524,7 @@ function getBootstrap(token) {
     budget: budget,
     budgetPlan: budgetPlan,
     formCounts: formCounts,
+    timeoff: timeoff,
     feedback: feedback,
     meta: {
       epicTypes: EPIC_TYPES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY,
@@ -950,14 +952,28 @@ function saveMember(token, data) {
     token: (existing && existing.token) ? existing.token : shortToken_(), // stable per member
     class: (data['class'] !== undefined) ? String(data['class'] || '').trim()
          : (existing ? String(existing['class'] || '').trim() : ''),
-    availability: (data.availability !== undefined) ? String(data.availability || '').trim()
-         : (existing ? String(existing.availability || '').trim() : ''),
-    avail_note: (data.avail_note !== undefined) ? String(data.avail_note || '').trim()
-         : (existing ? String(existing.avail_note || '').trim() : ''),
   };
   const saved = existing ? updateRow_(TABS.MEMBERS, existing.email, clean) : insert_(TABS.MEMBERS, clean);
   return Object.assign({}, saved, { link: inviteLink_(saved.token) });
 }
+
+/* Time off / PTO — date-range unavailability per member, marked on calendar Sundays. */
+function savePTO(token, data) {
+  requireLeader_(token);
+  var clean = {
+    member: String(data.member || '').trim(),
+    start: fmtDate_(data.start || ''),
+    end: fmtDate_(data.end || data.start || ''),
+    note: String(data.note || '').trim(),
+  };
+  if (!clean.member) throw new Error('Pick a member');
+  if (!clean.start) throw new Error('Start date is required');
+  if (!clean.end) clean.end = clean.start;
+  if (data.id) return updateRow_(TABS.TIMEOFF, data.id, clean);
+  clean.id = uuid_();
+  return insert_(TABS.TIMEOFF, clean);
+}
+function deletePTO(token, id) { requireLeader_(token); return deleteRow_(TABS.TIMEOFF, id); }
 
 function deleteMember(token, email) {
   const me = requireAdmin_(token);

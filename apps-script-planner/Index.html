@@ -938,9 +938,10 @@ function renderEpics(){
     +seg
     +'<select id="ayPick" style="width:auto">'+ayList.map(function(y){return '<option value="'+y+'"'+(y===CALYEAR?' selected':'')+'>'+ayLabel(y)+'</option>';}).join('')+'</select>'
     +'<label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showArch" style="width:auto"'+(SHOW_ARCHIVED?' checked':'')+'> show archived</label>'
-    +(lead?'<button class="sm" id="tidyE">Tidy completed</button><button class="primary" id="newEpic">+ New event</button>':'')
+    +(lead?'<button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button><button class="primary" id="newEpic">+ New event</button>':'')
     +'</div></div><div id="progBody"></div>';
   if(lead)$('#newEpic').onclick=function(){openEpicForm();};
+  if(lead){var pb=$('#ptoBtn');if(pb)pb.onclick=openTimeOff;}
   if(lead)$('#tidyE').onclick=function(){confirmDo('Archive every completed event (all tasks done, or no tasks and the date has passed)?',function(){return api('tidyCompleted');},'Tidied');};
   var sa=$('#showArch');if(sa)sa.onchange=function(){SHOW_ARCHIVED=this.checked;renderEpics();};
   var ap=$('#ayPick');if(ap)ap.onchange=function(){CALYEAR=+this.value;renderEpics();};
@@ -992,6 +993,8 @@ function renderEventsByDate(container){
       :{html:'<span class="muted">Regular Sunday school class</span>',id:null});
     evs.forEach(function(e){cells.push({html:'<span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':''),id:e.id});});
     if(bday[k]&&bday[k].length){var bn=bday[k].map(function(bb){return esc(bb.name)+(leaderV&&bb.class?' <span class="muted">('+esc(bb.class)+')</span>':'');}).join(', ');cells.push({html:'<span style="color:var(--gold)">🎂 '+(bday[k].length>1?'Birthdays':'Birthday')+': '+bn+'</span>',id:null});}
+    var away=(S.timeoff||[]).filter(function(p){return p.start&&p.member&&String(k)>=String(p.start)&&String(k)<=String(p.end||p.start);}).map(function(p){return esc(p.member)+(p.note?' <span class="muted">('+esc(p.note)+')</span>':'');});
+    if(away.length)cells.push({html:'<span style="color:var(--bad)">🌴 Away: '+away.join(', ')+'</span>',id:null});
     if(!cells.length)return;
     cells.forEach(function(c,i){
       var at=c.id?' data-e="'+esc(c.id)+'" style="cursor:pointer"':(c.sun?' data-sun="'+esc(c.sun)+'" style="cursor:pointer"':'');
@@ -1240,12 +1243,6 @@ function bindBudgetRows(){
 
 /* ------------ members (admin) ------------ */
 var MEMFILTER='',MEMMODE='roster';
-var AVAIL_OPTS=['Available','On break','Unavailable'];
-function availChip(m){
-  var a=String(m.availability||'').trim()||'Available';
-  var cls=a==='Available'?'p-Completed':(a==='On break'?'p-Pending':'p-over');
-  return '<span class="pill '+cls+'">'+esc(a)+'</span>'+(m.avail_note?' <span class="muted">'+esc(m.avail_note)+'</span>':'');
-}
 function memSeg_(){return '<div class="seg"><button data-mm="roster" class="'+(MEMMODE==='roster'?'on':'')+'">Roster</button><button data-mm="assignments" class="'+(MEMMODE==='assignments'?'on':'')+'">Assignments</button></div>';}
 function bindMemSeg_(root){Array.prototype.forEach.call(root.querySelectorAll('.seg button[data-mm]'),function(b){b.onclick=function(){MEMMODE=b.getAttribute('data-mm');renderMembers();};});}
 function renderMembers(){
@@ -1256,11 +1253,10 @@ function renderMembers(){
   var list=MEMFILTER?S.members.filter(function(m){return String(m.class||'')===MEMFILTER;}):S.members;
   v.innerHTML='<div class="row"><h2>Members</h2><div class="flex">'+memSeg_()+filter+(manage?'<button class="primary" id="newM">+ Add member</button>':'')+'</div></div>'
    +(manage?'<p class="small muted">Members sign in with Google using the email listed here. Add an email + role (and a class for teachers) to grant access; remove the row to revoke.</p>':'<p class="small muted">Read-only view of the team and their roles.</p>')
-   +'<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Class</th><th>Availability</th>'+(manage?'<th></th>':'')+'</tr></thead><tbody>'
+   +'<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Class</th>'+(manage?'<th></th>':'')+'</tr></thead><tbody>'
    +list.map(function(m){
       return '<tr><td>'+esc(m.name)+'</td><td class="small">'+esc(m.email)+'</td><td><span class="chip">'+esc(roleLabel(m.role))+'</span></td>'
        +'<td class="small">'+(m.class?'<span class="chip">'+esc(m.class)+'</span>':'<span class="muted">—</span>')+'</td>'
-       +'<td class="small">'+availChip(m)+'</td>'
        +(manage?'<td class="small nowrap"><a data-me="'+esc(m.email)+'">Edit</a> · <a data-md="'+esc(m.email)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';}).join('')
    +'</tbody></table>';
   var mf=$('#mFilter');if(mf)mf.onchange=function(){MEMFILTER=this.value;renderMembers();};
@@ -1492,7 +1488,14 @@ function openEpicForm(e){
 function openTaskForm(epicId,t){
   t=t||{};
   var owners=['(unassigned)'].concat(S.memberOptions);
-  var evList=S.epics.filter(function(e){return String(e.archived||'').trim()==='';});
+  var evList=S.epics.filter(function(e){
+    if(String(e.archived||'').trim()!=='')return false;
+    if(String(e.id)===String(epicId))return true;           // always keep the task's own event
+    if(eventComplete(e))return false;                        // hide completed events
+    var m=String(e.event_date||'').match(/^(\d{4})/);
+    if(m&&+m[1]<2026)return false;                           // hide pre-2026 dated events (undated buckets stay)
+    return true;
+  }).sort(function(a,b){return (a.event_date||'0').localeCompare(b.event_date||'0');});
   function evLabel(e){return e.name+(e.event_date?' ('+e.event_date+')':'');}
   var evNames=evList.map(evLabel),evByLabel={};evList.forEach(function(e){evByLabel[evLabel(e)]=e.id;});
   var curEv=epicId?evLabel(evList.filter(function(e){return String(e.id)===String(epicId);})[0]||{name:''}):'';
@@ -1521,11 +1524,40 @@ function openMemberForm(m){
     {name:'email',label:'Gmail address',value:m.email,required:true},
     {name:'role',label:'Role',type:'select',options:S.meta.roles.map(roleLabel),value:m.role?roleLabel(m.role):'Teacher'},
     {name:'class',label:'Class (only for teacher / co-teacher)',type:'select',options:['(none)'].concat(S.meta.classes||[]),value:m['class']||'(none)'},
-    {name:'availability',label:'Availability',type:'select',options:AVAIL_OPTS,value:m.availability||'Available'},
-    {name:'avail_note',label:'Availability note',hint:'e.g. traveling until Sept, Sundays only',value:m.avail_note},
   ],function(o){o.role=unLabel(o.role);o.email=m.email||o.email;if(o['class']==='(none)')o['class']='';return reloadAfter(api('saveMember',o),'Saved');});
 }
 function unLabel(l){var map={Administrator:'admin','Co-Leader':'co_leader',Teacher:'teacher','Co-Teacher':'co_teacher',Treasurer:'treasurer','Board Rep':'board_rep',Chairman:'chairman'};return map[l]||l;}
+function openTimeOff(){
+  var bd=document.createElement('div');bd.className='backdrop';
+  function rows(){
+    var t=(S.timeoff||[]).slice().sort(function(a,b){return String(a.start).localeCompare(String(b.start));});
+    if(!t.length)return '<div class="empty">No time off recorded yet.</div>';
+    return '<table><tbody>'+t.map(function(p){return '<tr><td><b>'+esc(p.member)+'</b></td><td class="small">'+esc(p.start)+' → '+esc(p.end)+'</td><td class="small muted">'+esc(p.note||'')+'</td><td class="small nowrap"><a data-delpto="'+esc(p.id)+'" style="color:var(--bad);cursor:pointer">✕</a></td></tr>';}).join('')+'</tbody></table>';
+  }
+  bd.innerHTML='<div class="modal" style="max-width:560px"><h3>🌴 Time off</h3>'
+    +'<p class="small muted" style="margin-top:0">Marks the person as Away on those days in the calendar (Sundays included).</p>'
+    +'<div id="ptoList">'+rows()+'</div>'
+    +'<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px"><div class="small muted" style="margin-bottom:6px">Add time off</div>'
+    +'<div class="flex" style="gap:8px;flex-wrap:wrap;align-items:flex-end">'
+    +'<div style="flex:1;min-width:150px"><label class="small">Member</label><select id="ptoMember">'+(S.memberOptions||[]).map(function(n){return '<option>'+esc(n)+'</option>';}).join('')+'</select></div>'
+    +'<div><label class="small">From</label><input type="date" id="ptoStart"></div>'
+    +'<div><label class="small">To</label><input type="date" id="ptoEnd"></div></div>'
+    +'<label class="small" style="margin-top:8px">Note (optional)</label><input id="ptoNote" placeholder="e.g. vacation, traveling">'
+    +'<button class="primary" id="ptoAdd" style="margin-top:10px">Add</button></div>'
+    +'<div class="actions"><button id="ptoClose">Close</button></div></div>';
+  document.body.appendChild(bd);
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#ptoClose',bd).onclick=function(){bd.remove();};
+  function refresh(){return api('getBootstrap').then(function(d){S=d;$('#ptoList',bd).innerHTML=rows();bindDel();renderView();});}
+  function bindDel(){Array.prototype.forEach.call(bd.querySelectorAll('[data-delpto]'),function(a){a.onclick=function(){api('deletePTO',a.getAttribute('data-delpto')).then(refresh).catch(apiErr);};});}
+  bindDel();
+  $('#ptoAdd',bd).onclick=function(){
+    var payload={member:$('#ptoMember',bd).value,start:$('#ptoStart',bd).value,end:$('#ptoEnd',bd).value,note:$('#ptoNote',bd).value};
+    if(!payload.start){toast('Pick a start date');return;}
+    var btn=$('#ptoAdd',bd);btn.disabled=true;btn.textContent='Adding…';
+    api('savePTO',payload).then(refresh).then(function(){$('#ptoStart',bd).value='';$('#ptoEnd',bd).value='';$('#ptoNote',bd).value='';btn.disabled=false;btn.textContent='Add';toast('Added');}).catch(function(e){btn.disabled=false;btn.textContent='Add';apiErr(e);});
+  };
+}
 function openBudgetForm(b){
   b=b||{};
   var epicOpts=['(none)'].concat(S.epics.map(function(e){return e.name;}));
