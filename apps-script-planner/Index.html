@@ -876,12 +876,13 @@ function eventCard(e){
   var badge=arch?'archived':(done?'✓ Complete':cd.txt);var bcls=arch?'':(done?'cd-done':cd.cls);
   return '<div class="card click" data-e="'+esc(e.id)+'"'+(arch?' style="opacity:.55"':'')+'>'
     +'<div class="flex" style="justify-content:space-between"><span class="chip">'+esc(e.program||'—')+'</span><span class="small '+bcls+'">'+badge+'</span></div>'
-    +'<h3 style="margin:8px 0 4px">'+esc(e.name)+'</h3>'
+    +'<h3 style="margin:8px 0 4px">'+esc(e.name)+formBadge(e.id)+'</h3>'
     +'<div class="small muted">'+esc(e.event_date||'no date')+' · '+esc(e.status||'')+'</div>'
     +'<div class="bar" style="margin-top:10px"><i style="width:'+p.pct+'%"></i></div>'
     +'<div class="small muted" style="margin-top:4px">'+p.done+'/'+p.total+' tasks done</div>'
     +'</div>';
 }
+function formBadge(id){var n=(S.formCounts||{})[id]||0;return n?' <span class="chip" style="background:#e7eef7;color:#1b6cb0" title="'+n+' registration form'+(n===1?'':'s')+'">📋 '+n+'</span>':'';}
 function renderEpicCards(container,readonly){
   var list=activeEventsCurAy();
   if(!list.length){container.className='';container.innerHTML='<div class="empty">No events yet.</div>';return;}
@@ -1199,7 +1200,7 @@ function renderCalendar(){
 }
 function calCard(e){var cd=countdown(e.event_date);var p=epicProgress(e.id);
   return '<div class="card click" data-e="'+esc(e.id)+'"><div class="flex" style="justify-content:space-between"><b>'+esc(e.event_date||'—')+'</b><span class="small '+cd.cls+'">'+cd.txt+'</span></div>'
-   +'<div style="margin-top:4px">'+esc(e.name)+'</div><div class="small muted">'+esc(e.type||'')+' · '+p.done+'/'+p.total+' tasks</div></div>';}
+   +'<div style="margin-top:4px">'+esc(e.name)+formBadge(e.id)+'</div><div class="small muted">'+esc(e.type||'')+' · '+p.done+'/'+p.total+' tasks</div></div>';}
 
 /* ------------ budget ------------ */
 function renderBudget(){
@@ -1295,9 +1296,31 @@ function renderEventForms(eventId){
 function paintForms(eventId,list,canManage){
   var b=$('#evFormsBody');if(!b)return;
   if(!list.length){b.innerHTML='<div class="empty">No forms yet.'+(canManage?' Create a registration form — it makes a Google Form + its own responses sheet in Drive.':'')+'</div>';return;}
-  b.innerHTML=list.map(function(f){return '<div class="row" style="padding:8px 0;border-bottom:1px solid var(--line)"><div><b>'+esc(f.title)+'</b><div class="small"><a href="'+esc(f.published_url)+'" target="_blank">Open form</a> · <a href="'+esc(f.edit_url)+'" target="_blank">Edit questions</a> · <a href="'+esc(f.sheet_url)+'" target="_blank">Responses</a>'+(f.published_url?' · <a data-cpf="'+esc(f.published_url)+'" style="cursor:pointer">Copy link</a>':'')+'</div></div>'+(canManage?'<a data-delform="'+esc(f.id)+'" style="color:var(--bad);cursor:pointer" class="small nowrap">Delete</a>':'')+'</div>';}).join('');
+  b.innerHTML=list.map(function(f){return '<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="row"><div><b>'+esc(f.title)+'</b><div class="small">'
+      +'<a data-vresp="'+esc(f.id)+'" style="cursor:pointer">👁 View registrations</a> · '
+      +'<a href="'+esc(f.published_url)+'" target="_blank">Open form</a> · '
+      +'<a href="'+esc(f.edit_url)+'" target="_blank">Edit questions</a> · '
+      +'<a href="'+esc(f.sheet_url)+'" target="_blank">Sheet</a>'
+      +(f.published_url?' · <a data-cpf="'+esc(f.published_url)+'" style="cursor:pointer">Copy link</a>':'')
+      +'</div></div>'+(canManage?'<a data-delform="'+esc(f.id)+'" style="color:var(--bad);cursor:pointer" class="small nowrap">Delete</a>':'')+'</div>'
+      +'<div id="resp-'+esc(f.id)+'"></div></div>';}).join('');
   Array.prototype.forEach.call(b.querySelectorAll('[data-cpf]'),function(a){a.onclick=function(){copyText(a.getAttribute('data-cpf'));toast('Form link copied');};});
+  Array.prototype.forEach.call(b.querySelectorAll('[data-vresp]'),function(a){a.onclick=function(){toggleResponses(a.getAttribute('data-vresp'),a);};});
   if(canManage)Array.prototype.forEach.call(b.querySelectorAll('[data-delform]'),function(a){a.onclick=function(){confirmDo('Delete this form and its responses? This cannot be undone.',function(){return api('deleteEventForm',a.getAttribute('data-delform'));},'Deleted',function(){renderEventForms(eventId);});};});
+}
+function toggleResponses(formId,link){
+  var host=$('#resp-'+formId);if(!host)return;
+  if(host.getAttribute('data-open')==='1'){host.innerHTML='';host.removeAttribute('data-open');link.textContent='👁 View registrations';return;}
+  host.setAttribute('data-open','1');link.textContent='Hide registrations';host.innerHTML='<div class="small muted" style="padding:6px 0">Loading…</div>';
+  api('getFormResponses',formId).then(function(d){host.innerHTML=responsesTable(d);}).catch(function(e){host.innerHTML='<div class="small muted">'+esc((e&&e.message)||'Could not load')+'</div>';});
+}
+function responsesTable(d){
+  if(!d||!d.count)return '<div class="empty" style="margin:6px 0">No registrations yet.</div>';
+  var hd=d.headers||[],rows=d.rows||[];
+  return '<div class="small muted" style="margin:8px 0 4px"><b>'+d.count+'</b> registration'+(d.count===1?'':'s')+'</div>'
+    +'<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table style="font-size:13px"><thead><tr>'+hd.map(function(h){return '<th style="white-space:nowrap">'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'
+    +rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>';}).join('')
+    +'</tbody></table></div>';
 }
 function createFormPrompt(eventId){
   modal('Create registration form',[{name:'title',label:'Form title',hint:'blank = "Registration — <event name>"',value:''}],function(out){

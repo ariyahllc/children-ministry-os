@@ -508,6 +508,7 @@ function getBootstrap(token) {
   const showBudget = LEADERS.indexOf(me.role) >= 0 || me.role === 'treasurer' || OBSERVERS.indexOf(me.role) >= 0;
   const budget = showBudget ? readTable_(TABS.BUDGET).map(sanitizeRow_) : [];
   const budgetPlan = showBudget ? readTable_(TABS.BUDGETPLAN).map(sanitizeRow_) : [];
+  const formCounts = {}; readTable_(TABS.FORMS).forEach(function (f) { formCounts[f.epic_id] = (formCounts[f.epic_id] || 0) + 1; });
   const feedback = readTable_(TABS.FEEDBACK).map(sanitizeRow_);
 
   return {
@@ -519,6 +520,7 @@ function getBootstrap(token) {
     memberOptions: memberRows.map(m => m.name).filter(Boolean), // for owner dropdowns
     budget: budget,
     budgetPlan: budgetPlan,
+    formCounts: formCounts,
     feedback: feedback,
     meta: {
       epicTypes: EPIC_TYPES, taskStatus: TASK_STATUS, taskPriority: TASK_PRIORITY,
@@ -1165,6 +1167,19 @@ function getEventForms(token, eventId) {
   // cheap: just the stored links (no FormApp open). Response counts live in the linked sheet.
   return readTable_(TABS.FORMS).filter(function (f) { return String(f.epic_id) === String(eventId); })
     .map(function (f) { return { id: f.id, title: f.title, published_url: f.published_url, edit_url: f.edit_url, sheet_url: f.sheet_url, created: fmtDate_(f.created) }; });
+}
+function getFormResponses(token, formId) {
+  var me = requireMember_(token);
+  if (LEADERS.indexOf(me.role) < 0 && DOERS.indexOf(me.role) < 0) throw new Error('NOT_ALLOWED');
+  var f = readTable_(TABS.FORMS).find(function (x) { return String(x.id) === String(formId); });
+  if (!f) throw new Error('Form not found');
+  var m = String(f.sheet_url).match(/[-\w]{25,}/); if (!m) throw new Error('No response sheet');
+  var sh = SpreadsheetApp.openById(m[0]).getSheets()[0];
+  var vals = sh.getDataRange().getValues();
+  if (vals.length < 1) return { headers: [], rows: [], count: 0 };
+  var headers = vals.shift().map(String);
+  var rows = vals.slice(0, 300).map(function (r) { return r.map(function (c) { return (c instanceof Date) ? fmtDate_(c) : String(c); }); });
+  return { headers: headers, rows: rows, count: rows.length };
 }
 function deleteEventForm(token, formId) {
   requireLeader_(token);
