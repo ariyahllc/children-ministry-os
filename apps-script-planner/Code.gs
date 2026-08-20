@@ -34,7 +34,7 @@ const TABS = {
 };
 
 const SCHEMA = {
-  Members:  ['email', 'name', 'role', 'token', 'class'],
+  Members:  ['email', 'name', 'role', 'token', 'class', 'availability', 'avail_note'],
   Events:   ['id', 'name', 'type', 'event_date', 'status', 'notes', 'program', 'archived', 'no_school'],
   Tasks:    ['id', 'epic_id', 'title', 'owner', 'due_offset', 'due_date', 'status', 'priority', 'notes'],
   Expenses: ['id', 'epic_id', 'item', 'category', 'amount', 'status', 'notes', 'date', 'paid_by', 'reimbursed', 'receipt_url', 'budget_category'],
@@ -501,9 +501,11 @@ function getBootstrap(token) {
   const isObserver = OBSERVERS.indexOf(me.role) >= 0;
   const members = (me.role === 'admin') ? memberRows.map(m => ({
     email: m.email, name: m.name, role: m.role, class: m['class'] || '',
+    availability: m.availability || '', avail_note: m.avail_note || '',
     token: m.token || '', link: (webBase && m.token) ? (webBase + '?k=' + encodeURIComponent(m.token)) : '',
   })) : isObserver ? memberRows.map(m => ({ // board rep: read-only, no tokens/links
-    email: m.email, name: m.name, role: m.role, class: m['class'] || '', token: '', link: '',
+    email: m.email, name: m.name, role: m.role, class: m['class'] || '',
+    availability: m.availability || '', avail_note: m.avail_note || '', token: '', link: '',
   })) : [];
   const showBudget = LEADERS.indexOf(me.role) >= 0 || me.role === 'treasurer' || OBSERVERS.indexOf(me.role) >= 0;
   const budget = showBudget ? readTable_(TABS.BUDGET).map(sanitizeRow_) : [];
@@ -948,6 +950,10 @@ function saveMember(token, data) {
     token: (existing && existing.token) ? existing.token : shortToken_(), // stable per member
     class: (data['class'] !== undefined) ? String(data['class'] || '').trim()
          : (existing ? String(existing['class'] || '').trim() : ''),
+    availability: (data.availability !== undefined) ? String(data.availability || '').trim()
+         : (existing ? String(existing.availability || '').trim() : ''),
+    avail_note: (data.avail_note !== undefined) ? String(data.avail_note || '').trim()
+         : (existing ? String(existing.avail_note || '').trim() : ''),
   };
   const saved = existing ? updateRow_(TABS.MEMBERS, existing.email, clean) : insert_(TABS.MEMBERS, clean);
   return Object.assign({}, saved, { link: inviteLink_(saved.token) });

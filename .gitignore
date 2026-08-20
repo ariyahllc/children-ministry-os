@@ -32,3 +32,9 @@ dist-ssr
 
 # Local agent config
 .claude/
+
+# clasp local token + creds (never commit)
+.clasprc.json
+**/.clasprc.json
+client_secret*.json
+creds.json

@@ -41,7 +41,7 @@
   .nav button{border:none;background:transparent;border-radius:9px;color:var(--muted);font-weight:500;padding:7px 14px}
   .nav button:hover{background:var(--subtle);color:var(--ink)}
   .nav button.active{background:var(--chip);color:var(--chip-ink)}
-  .wrap{max-width:1060px;margin:0 auto;padding:24px 22px}
+  .wrap{max-width:1320px;margin:0 auto;padding:24px 30px}
   .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
   h2{font-family:'Fraunces',Georgia,serif;font-size:26px;margin:0;letter-spacing:-.01em;font-weight:600}
   h3{font-family:'Fraunces',Georgia,serif;font-size:17px;margin:0 0 8px;font-weight:600}
@@ -630,12 +630,27 @@ function renderMyTasksView(){
     var open=all.filter(function(t){return t.status!=='Completed';});
     var done=all.filter(function(t){return t.status==='Completed';});
     var unassigned=open.filter(function(t){return !String(t.owner||'').trim();});
-    var list=(TASKS_SHOW_DONE?all:open); // leaderTaskTable applies the active sort
+    var base=(TASKS_SHOW_DONE?all:open); // leaderTaskTable applies the active sort
+    var owners=[];all.forEach(function(t){var o=String(t.owner||'').trim();if(o&&owners.indexOf(o)<0)owners.push(o);});owners.sort();
+    function applyTaskFilters(){
+      var q=(TASK_SEARCH||'').toLowerCase();
+      return base.filter(function(t){
+        if(TASK_OWNER==='__un'&&String(t.owner||'').trim())return false;
+        if(TASK_OWNER!=='__all'&&TASK_OWNER!=='__un'&&String(t.owner||'')!==TASK_OWNER)return false;
+        if(q&&String(t.title||'').toLowerCase().indexOf(q)<0&&String(t.owner||'').toLowerCase().indexOf(q)<0&&String(t.epic_name||'').toLowerCase().indexOf(q)<0)return false;
+        return true;
+      });
+    }
+    function paintTasks(){var w=$('#taskTableWrap');if(!w)return;var f=applyTaskFilters();w.innerHTML=f.length?leaderTaskTable(f):'<div class="empty">No matching tasks.</div>';bindTaskRows(true);}
+    var ownerOpts='<option value="__all"'+(TASK_OWNER==='__all'?' selected':'')+'>All owners</option><option value="__un"'+(TASK_OWNER==='__un'?' selected':'')+'>Unassigned</option>'+owners.map(function(o){return '<option'+(TASK_OWNER===o?' selected':'')+'>'+esc(o)+'</option>';}).join('');
     v.innerHTML='<div class="row"><h2>Tasks</h2><div class="flex"><label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showDone" style="width:auto"'+(TASKS_SHOW_DONE?' checked':'')+'> show completed</label><button class="primary" id="newTask">+ New task</button></div></div>'
       +'<div class="kpis">'+kpi(open.length,'Open')+kpi(open.filter(isOverdue).length,'Overdue',open.filter(isOverdue).length?'var(--bad)':'')+kpi(unassigned.length,'Unassigned',unassigned.length?'var(--warn)':'')+kpi(done.length,'Completed')+'</div>'
-      +(list.length?leaderTaskTable(list):'<div class="empty">'+(TASKS_SHOW_DONE?'No tasks yet.':'Nothing open — all caught up.')+'</div>');
+      +'<div class="flex" style="gap:10px;margin:0 0 12px"><input id="taskSearch" placeholder="🔎 Search tasks, owner, event…" value="'+esc(TASK_SEARCH)+'" style="max-width:320px"><select id="taskOwner" style="width:auto">'+ownerOpts+'</select></div>'
+      +'<div id="taskTableWrap">'+(function(){var f=applyTaskFilters();return f.length?leaderTaskTable(f):'<div class="empty">No matching tasks.</div>';})()+'</div>';
     $('#showDone').onchange=function(){TASKS_SHOW_DONE=this.checked;renderMyTasksView();};
     $('#newTask').onclick=function(){openTaskForm(null);};
+    var ts=$('#taskSearch');if(ts)ts.oninput=function(){TASK_SEARCH=this.value;paintTasks();};
+    var to=$('#taskOwner');if(to)to.onchange=function(){TASK_OWNER=this.value;paintTasks();};
     bindTaskRows(true);
     return;
   }
@@ -911,6 +926,7 @@ function ayOf(dstr){var m=String(dstr).match(/^(\d{4})-(\d{2})/);if(!m)return nu
 function ayLabel(y){return y+'–'+String(y+1).slice(2);} // 2026–27
 var CALMODE='calendar';
 var TASKS_SHOW_DONE=false;
+var TASK_SEARCH='',TASK_OWNER='__all';
 function renderEpics(){
   var v=$('#view');var lead=S.meta.canManageEpics;
   var ays={};activeEvents().forEach(function(e){if(e.event_date){var a=ayOf(e.event_date);if(a!=null)ays[a]=true;}});
@@ -1224,6 +1240,12 @@ function bindBudgetRows(){
 
 /* ------------ members (admin) ------------ */
 var MEMFILTER='',MEMMODE='roster';
+var AVAIL_OPTS=['Available','On break','Unavailable'];
+function availChip(m){
+  var a=String(m.availability||'').trim()||'Available';
+  var cls=a==='Available'?'p-Completed':(a==='On break'?'p-Pending':'p-over');
+  return '<span class="pill '+cls+'">'+esc(a)+'</span>'+(m.avail_note?' <span class="muted">'+esc(m.avail_note)+'</span>':'');
+}
 function memSeg_(){return '<div class="seg"><button data-mm="roster" class="'+(MEMMODE==='roster'?'on':'')+'">Roster</button><button data-mm="assignments" class="'+(MEMMODE==='assignments'?'on':'')+'">Assignments</button></div>';}
 function bindMemSeg_(root){Array.prototype.forEach.call(root.querySelectorAll('.seg button[data-mm]'),function(b){b.onclick=function(){MEMMODE=b.getAttribute('data-mm');renderMembers();};});}
 function renderMembers(){
@@ -1234,10 +1256,11 @@ function renderMembers(){
   var list=MEMFILTER?S.members.filter(function(m){return String(m.class||'')===MEMFILTER;}):S.members;
   v.innerHTML='<div class="row"><h2>Members</h2><div class="flex">'+memSeg_()+filter+(manage?'<button class="primary" id="newM">+ Add member</button>':'')+'</div></div>'
    +(manage?'<p class="small muted">Members sign in with Google using the email listed here. Add an email + role (and a class for teachers) to grant access; remove the row to revoke.</p>':'<p class="small muted">Read-only view of the team and their roles.</p>')
-   +'<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Class</th>'+(manage?'<th></th>':'')+'</tr></thead><tbody>'
+   +'<table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Class</th><th>Availability</th>'+(manage?'<th></th>':'')+'</tr></thead><tbody>'
    +list.map(function(m){
       return '<tr><td>'+esc(m.name)+'</td><td class="small">'+esc(m.email)+'</td><td><span class="chip">'+esc(roleLabel(m.role))+'</span></td>'
        +'<td class="small">'+(m.class?'<span class="chip">'+esc(m.class)+'</span>':'<span class="muted">—</span>')+'</td>'
+       +'<td class="small">'+availChip(m)+'</td>'
        +(manage?'<td class="small nowrap"><a data-me="'+esc(m.email)+'">Edit</a> · <a data-md="'+esc(m.email)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';}).join('')
    +'</tbody></table>';
   var mf=$('#mFilter');if(mf)mf.onchange=function(){MEMFILTER=this.value;renderMembers();};
@@ -1498,6 +1521,8 @@ function openMemberForm(m){
     {name:'email',label:'Gmail address',value:m.email,required:true},
     {name:'role',label:'Role',type:'select',options:S.meta.roles.map(roleLabel),value:m.role?roleLabel(m.role):'Teacher'},
     {name:'class',label:'Class (only for teacher / co-teacher)',type:'select',options:['(none)'].concat(S.meta.classes||[]),value:m['class']||'(none)'},
+    {name:'availability',label:'Availability',type:'select',options:AVAIL_OPTS,value:m.availability||'Available'},
+    {name:'avail_note',label:'Availability note',hint:'e.g. traveling until Sept, Sundays only',value:m.avail_note},
   ],function(o){o.role=unLabel(o.role);o.email=m.email||o.email;if(o['class']==='(none)')o['class']='';return reloadAfter(api('saveMember',o),'Saved');});
 }
 function unLabel(l){var map={Administrator:'admin','Co-Leader':'co_leader',Teacher:'teacher','Co-Teacher':'co_teacher',Treasurer:'treasurer','Board Rep':'board_rep',Chairman:'chairman'};return map[l]||l;}
