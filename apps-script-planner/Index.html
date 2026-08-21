@@ -1528,34 +1528,39 @@ function openMemberForm(m){
 }
 function unLabel(l){var map={Administrator:'admin','Co-Leader':'co_leader',Teacher:'teacher','Co-Teacher':'co_teacher',Treasurer:'treasurer','Board Rep':'board_rep',Chairman:'chairman'};return map[l]||l;}
 function openTimeOff(){
-  var bd=document.createElement('div');bd.className='backdrop';
+  var bd=document.createElement('div');bd.className='backdrop';var editId=null;
   function rows(){
     var t=(S.timeoff||[]).slice().sort(function(a,b){return String(a.start).localeCompare(String(b.start));});
     if(!t.length)return '<div class="empty">No time off recorded yet.</div>';
-    return '<table><tbody>'+t.map(function(p){return '<tr><td><b>'+esc(p.member)+'</b></td><td class="small">'+esc(p.start)+' → '+esc(p.end)+'</td><td class="small muted">'+esc(p.note||'')+'</td><td class="small nowrap"><a data-delpto="'+esc(p.id)+'" style="color:var(--bad);cursor:pointer">✕</a></td></tr>';}).join('')+'</tbody></table>';
+    return '<table><tbody>'+t.map(function(p){return '<tr'+(editId===p.id?' style="background:var(--subtle)"':'')+'><td><b>'+esc(p.member)+'</b></td><td class="small">'+esc(p.start)+' → '+esc(p.end)+'</td><td class="small muted">'+esc(p.note||'')+'</td><td class="small nowrap"><a data-editpto="'+esc(p.id)+'" style="cursor:pointer">Edit</a> · <a data-delpto="'+esc(p.id)+'" style="color:var(--bad);cursor:pointer">✕</a></td></tr>';}).join('')+'</tbody></table>';
   }
   bd.innerHTML='<div class="modal" style="max-width:560px"><h3>🌴 Time off</h3>'
     +'<p class="small muted" style="margin-top:0">Marks the person as Away on those days in the calendar (Sundays included).</p>'
     +'<div id="ptoList">'+rows()+'</div>'
-    +'<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px"><div class="small muted" style="margin-bottom:6px">Add time off</div>'
+    +'<div style="border-top:1px solid var(--line);margin-top:14px;padding-top:12px"><div class="small muted" style="margin-bottom:6px" id="ptoFormLabel">Add time off</div>'
     +'<div class="flex" style="gap:8px;flex-wrap:wrap;align-items:flex-end">'
     +'<div style="flex:1;min-width:150px"><label class="small">Member</label><select id="ptoMember">'+(S.memberOptions||[]).map(function(n){return '<option>'+esc(n)+'</option>';}).join('')+'</select></div>'
     +'<div><label class="small">From</label><input type="date" id="ptoStart"></div>'
     +'<div><label class="small">To</label><input type="date" id="ptoEnd"></div></div>'
     +'<label class="small" style="margin-top:8px">Note (optional)</label><input id="ptoNote" placeholder="e.g. vacation, traveling">'
-    +'<button class="primary" id="ptoAdd" style="margin-top:10px">Add</button></div>'
+    +'<div class="flex" style="margin-top:10px;gap:8px"><button class="primary" id="ptoAdd">Add</button><button id="ptoCancel" style="display:none">Cancel edit</button></div></div>'
     +'<div class="actions"><button id="ptoClose">Close</button></div></div>';
   document.body.appendChild(bd);
   bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
   $('#ptoClose',bd).onclick=function(){bd.remove();};
-  function refresh(){return api('getBootstrap').then(function(d){S=d;$('#ptoList',bd).innerHTML=rows();bindDel();renderView();});}
-  function bindDel(){Array.prototype.forEach.call(bd.querySelectorAll('[data-delpto]'),function(a){a.onclick=function(){api('deletePTO',a.getAttribute('data-delpto')).then(refresh).catch(apiErr);};});}
-  bindDel();
+  function resetForm(){editId=null;$('#ptoMember',bd).selectedIndex=0;$('#ptoStart',bd).value='';$('#ptoEnd',bd).value='';$('#ptoNote',bd).value='';$('#ptoAdd',bd).textContent='Add';$('#ptoFormLabel',bd).textContent='Add time off';$('#ptoCancel',bd).style.display='none';$('#ptoList',bd).innerHTML=rows();bindRowActions();}
+  function refresh(){return api('getBootstrap').then(function(d){S=d;$('#ptoList',bd).innerHTML=rows();bindRowActions();renderView();});}
+  function bindRowActions(){
+    Array.prototype.forEach.call(bd.querySelectorAll('[data-delpto]'),function(a){a.onclick=function(){api('deletePTO',a.getAttribute('data-delpto')).then(function(){if(editId===a.getAttribute('data-delpto'))resetForm();return refresh();}).catch(apiErr);};});
+    Array.prototype.forEach.call(bd.querySelectorAll('[data-editpto]'),function(a){a.onclick=function(){var p=(S.timeoff||[]).filter(function(x){return String(x.id)===a.getAttribute('data-editpto');})[0];if(!p)return;editId=p.id;$('#ptoMember',bd).value=p.member;$('#ptoStart',bd).value=p.start;$('#ptoEnd',bd).value=p.end;$('#ptoNote',bd).value=p.note||'';$('#ptoAdd',bd).textContent='Update';$('#ptoFormLabel',bd).textContent='Edit time off';$('#ptoCancel',bd).style.display='';$('#ptoList',bd).innerHTML=rows();bindRowActions();};});
+  }
+  bindRowActions();
+  $('#ptoCancel',bd).onclick=resetForm;
   $('#ptoAdd',bd).onclick=function(){
-    var payload={member:$('#ptoMember',bd).value,start:$('#ptoStart',bd).value,end:$('#ptoEnd',bd).value,note:$('#ptoNote',bd).value};
+    var payload={id:editId||'',member:$('#ptoMember',bd).value,start:$('#ptoStart',bd).value,end:$('#ptoEnd',bd).value,note:$('#ptoNote',bd).value};
     if(!payload.start){toast('Pick a start date');return;}
-    var btn=$('#ptoAdd',bd);btn.disabled=true;btn.textContent='Adding…';
-    api('savePTO',payload).then(refresh).then(function(){$('#ptoStart',bd).value='';$('#ptoEnd',bd).value='';$('#ptoNote',bd).value='';btn.disabled=false;btn.textContent='Add';toast('Added');}).catch(function(e){btn.disabled=false;btn.textContent='Add';apiErr(e);});
+    var btn=$('#ptoAdd',bd);btn.disabled=true;btn.textContent=editId?'Updating…':'Adding…';
+    api('savePTO',payload).then(refresh).then(function(){btn.disabled=false;resetForm();toast(payload.id?'Updated':'Added');}).catch(function(e){btn.disabled=false;btn.textContent=editId?'Update':'Add';apiErr(e);});
   };
 }
 function openBudgetForm(b){

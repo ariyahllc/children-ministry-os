@@ -970,6 +970,10 @@ function savePTO(token, data) {
   if (!clean.start) throw new Error('Start date is required');
   if (!clean.end) clean.end = clean.start;
   if (data.id) return updateRow_(TABS.TIMEOFF, data.id, clean);
+  var dup = readTable_(TABS.TIMEOFF).some(function (r) {
+    return String(r.member).trim().toLowerCase() === clean.member.toLowerCase() && fmtDate_(r.start) === clean.start && fmtDate_(r.end) === clean.end;
+  });
+  if (dup) throw new Error('That time off is already there — edit the existing entry instead.');
   clean.id = uuid_();
   return insert_(TABS.TIMEOFF, clean);
 }
