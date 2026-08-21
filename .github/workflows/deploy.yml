@@ -10,9 +10,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps-script-planner
     steps:
       - uses: actions/checkout@v4
 
@@ -20,15 +17,12 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Authenticate clasp
-        # --creds tokens are "local" format; clasp reads ./.clasprc.json in the project dir.
-        # Write to both the project dir (working-directory) and $HOME to be safe.
+      - name: Deploy via Apps Script API (durable, no clasp)
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
+          DEPLOYMENT_ID: ${{ secrets.CLASP_DEPLOYMENT_ID }}
         run: |
-          printf '%s' '${{ secrets.CLASPRC_JSON }}' > .clasprc.json
-          printf '%s' '${{ secrets.CLASPRC_JSON }}' > "$HOME/.clasprc.json"
-
-      - name: Push code
-        run: npx @google/clasp@2.4.2 push -f
-
-      - name: Deploy (update the live deployment)
-        run: npx @google/clasp@2.4.2 deploy -i "${{ secrets.CLASP_DEPLOYMENT_ID }}" -d "CI ${GITHUB_SHA::7}"
+          export SCRIPT_ID=$(node -e "console.log(require('./apps-script-planner/.clasp.json').scriptId)")
+          node ci/deploy.mjs
