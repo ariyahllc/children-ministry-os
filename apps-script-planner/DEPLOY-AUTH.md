@@ -1,33 +1,40 @@
-# CI deploy auth for clasp
+# CI deploy auth
 
-GitHub Actions deploys via clasp using the token in the `CLASPRC_JSON` secret.
+## Durable path (target — no clasp, non-expiring)
+CI deploys via the **Apps Script REST API** using `ci/deploy.mjs`, authed by a long-lived
+OAuth **refresh token** from the `clasp-ci` Desktop OAuth client (Internal consent) with the
+management scopes `script.projects` + `script.deployments`. No clasp, no npm install
+(Node built-in `fetch`). This does not suffer the clasp token expiry.
 
-## Current setup (works)
-- Auth = a plain **global `clasp login`** token (has the management scopes
-  `script.projects` + `script.deployments` that `clasp deploy` needs).
-- The secret `CLASPRC_JSON` holds `~/.clasprc.json`; `CLASP_DEPLOYMENT_ID` holds the live
-  deployment id. The workflow writes the token and runs `clasp push` + `clasp deploy`.
-- **Only CI runs clasp.** Do NOT run `clasp` locally (push/deploy/login) — doing so can
-  rotate/invalidate the shared refresh token and break CI (`invalid_grant`).
+**Secrets used:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`,
+`CLASP_DEPLOYMENT_ID` (the live deployment id). `SCRIPT_ID` is read from
+`apps-script-planner/.clasp.json` in the workflow.
 
-## If CI fails with `invalid_grant` (token died)
-1. Locally: `npx @google/clasp@2.4.2 login` — a **plain** login, signed in as
-   children-ministry@acfi.cc.
-   - Do NOT use `clasp login --creds`: that grants the *script's* runtime scopes (drive,
-     forms, spreadsheets…) for `clasp run`, NOT clasp's management scopes — so `push` limps
-     and `deploy` fails with **"Insufficient Permission."**
-2. Verify scopes include `script.projects` and `script.deployments`:
+### One-time setup
+1. Prereqs (already done): `clasp-ci` **Desktop** OAuth client created; OAuth consent screen
+   **Internal**; **Apps Script API** enabled.
+2. Mint the token + set the three secrets automatically:
    ```bash
-   node -e "console.log(require(require('os').homedir()+'/.clasprc.json').token.scope)"
+   node ci/mint-token.mjs ~/Downloads/client_secret_XXXX.json
    ```
-3. Update the secret + re-run:
-   ```bash
-   gh secret set CLASPRC_JSON -R ariyahllc/children-ministry-os < ~/.clasprc.json
-   gh workflow run deploy.yml -R ariyahllc/children-ministry-os
-   ```
+   Sign in as children-ministry@acfi.cc, approve. It stores GOOGLE_CLIENT_ID /
+   GOOGLE_CLIENT_SECRET / GOOGLE_REFRESH_TOKEN as GitHub secrets via `gh`.
+3. The workflow (`.github/workflows/deploy.yml`) runs `node ci/deploy.mjs` on push to
+   `apps-script-planner/**`. Deploys just work — no periodic re-login.
 
-## Truly durable option (only if the above keeps dying)
-Bypass clasp: a small Node deploy script hitting the Apps Script API directly, authed by a
-**service account with Google Workspace domain-wide delegation** (impersonating
-children-ministry@acfi.cc) or a custom OAuth client granted the management scopes. Non-
-expiring, but more moving parts — not built yet.
+### If the durable deploy ever fails
+- `invalid_grant` on refresh: the refresh token was revoked (e.g. consent screen flipped
+  back to External/Testing, or the client deleted). Re-run `ci/mint-token.mjs`.
+- `403 / PERMISSION_DENIED`: the token is missing a management scope, or the Apps Script API
+  is off — re-check step 1, then re-mint.
+
+---
+
+## Legacy path (clasp) — fallback only
+The old workflow used clasp with a `CLASPRC_JSON` secret from a plain global `clasp login`.
+It works but the token **expires fast** on this Workspace (recurring `invalid_grant`), which
+is why we moved to the durable path above. If you ever revert:
+- `npx @google/clasp@2.4.2 login` (plain — NOT `--creds`, which grants the script's runtime
+  scopes, missing `script.projects`/`script.deployments` so deploy fails "Insufficient
+  Permission"), then `gh secret set CLASPRC_JSON -R ariyahllc/children-ministry-os < ~/.clasprc.json`.
+- Verify scopes: `node -e "console.log(require(require('os').homedir()+'/.clasprc.json').token.scope)"`.
