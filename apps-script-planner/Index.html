@@ -37,7 +37,13 @@
   .spacer{flex:1}
   .me{text-align:right;line-height:1.25}
   .me .nm{font-weight:600;font-size:13px}
-  .nav{display:flex;gap:4px;padding:9px 22px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap;position:sticky;top:59px;z-index:4}
+  .nav{display:flex;gap:4px;padding:9px 22px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:59px;z-index:4}
+  .nav::-webkit-scrollbar{height:0}
+  .nav button{flex:0 0 auto}
+  .navbadge{display:inline-block;min-width:18px;padding:0 5px;height:18px;line-height:18px;text-align:center;font-size:11px;border-radius:999px;background:var(--pri);color:var(--pri-ink);margin-left:5px;vertical-align:middle;font-weight:700}
+  .menu{position:fixed;z-index:60;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.22);min-width:180px;padding:5px}
+  .menu-item{padding:10px 14px;cursor:pointer;border-radius:8px;font-size:14px;display:flex;gap:9px;align-items:center}
+  .menu-item:hover{background:var(--subtle)}
   .nav button{border:none;background:transparent;border-radius:9px;color:var(--muted);font-weight:500;padding:7px 14px}
   .nav button:hover{background:var(--subtle);color:var(--ink)}
   .nav button.active{background:var(--chip);color:var(--chip-ink)}
@@ -217,12 +223,18 @@ function renderNoAccess(){
 }
 
 /* ------------ shell ------------ */
+function openTaskCount(){
+  var t=(S.me.role==='admin'||S.me.role==='co_leader')?(S.tasks||[]):myTasks();
+  return t.filter(function(x){return x.status!=='Completed'&&(S.me.role==='admin'||S.me.role==='co_leader'?true:String(x.owner)===String(S.me.name));}).length;
+}
+function navBadge(n){return n>0?' <span class="navbadge">'+n+'</span>':'';}
 function navFor(role){
   var items=[['dashboard','Dashboard']];
   if(S.meta.canViewChildren)items.push(['weekly','This Sunday']);
-  if(role==='admin'||role==='co_leader')items.push(['mytasks','Tasks']);
-  else if(role==='treasurer'||role==='board_rep'||role==='chairman')items.push(['mytasks','My tasks']);
-  items.push(['epics','Calendar']);
+  var tc=openTaskCount();
+  if(role==='admin'||role==='co_leader')items.push(['mytasks','Tasks'+navBadge(tc)]);
+  else if(role==='treasurer'||role==='board_rep'||role==='chairman')items.push(['mytasks','My tasks'+navBadge(tc)]);
+  items.push(['epics','Events']);
   if(S.meta.canViewRoster)items.push(['children','Children']);
   if(S.meta.canViewFinances&&role!=='treasurer')items.push(['finances','Finances']);
   if(S.meta.canViewMembers)items.push(['members','Members']);
@@ -233,6 +245,7 @@ function render(){
   var nav=navFor(me.role).map(function(n){return '<button data-v="'+n[0]+'" class="'+(VIEW===n[0]?'active':'')+'">'+n[1]+'</button>';}).join('');
   $('#root').innerHTML=
     '<div class="topbar"><div class="brand"><span class="dot">✝</span> CM Planner</div><div class="spacer"></div>'
+    +(S.meta.canManageEpics?'<button class="primary sm" id="globalNew" style="margin-right:10px">＋ New</button>':'')
     +'<button class="sm" id="theme" title="Toggle light / dark" style="margin-right:10px">'+(currentTheme()==='dark'?'☀':'🌙')+'</button>'
     +'<div class="me"><div class="nm">'+esc(me.name)+'</div><div class="chip">'+esc(roleLabel(me.role))+'</div></div>'
     +'<button class="sm" id="signout" style="margin-left:10px">Sign out</button></div>'
@@ -240,9 +253,22 @@ function render(){
     +'<div class="wrap" id="view"></div>';
   var so=$('#signout'); if(so)so.onclick=signOut;
   var th=$('#theme'); if(th)th.onclick=toggleTheme;
+  var gn=$('#globalNew'); if(gn)gn.onclick=function(e){e.stopPropagation();openNewMenu(gn);};
   Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){b.onclick=function(){VIEW=b.getAttribute('data-v');EPIC=null;render();};});
   renderView();
   mountDorothy();
+}
+function closeNewMenu(){var m=document.getElementById('newMenu');if(m)m.remove();document.removeEventListener('click',onDocNewMenu);}
+function onDocNewMenu(e){var m=document.getElementById('newMenu');if(m&&!m.contains(e.target)&&(!e.target||e.target.id!=='globalNew'))closeNewMenu();}
+function openNewMenu(btn){
+  if(document.getElementById('newMenu')){closeNewMenu();return;}
+  var opts=[['📅','Event',function(){openEpicForm();}],['✅','Task',function(){openTaskForm(null);}],['🌴','Time off',function(){openTimeOff();}]];
+  var m=document.createElement('div');m.id='newMenu';m.className='menu';
+  m.innerHTML=opts.map(function(o,i){return '<div class="menu-item" data-i="'+i+'"><span>'+o[0]+'</span> New '+esc(o[1].toLowerCase())+'</div>';}).join('');
+  document.body.appendChild(m);
+  var r=btn.getBoundingClientRect();m.style.top=(r.bottom+6)+'px';m.style.right=Math.max(8,(window.innerWidth-r.right))+'px';
+  Array.prototype.forEach.call(m.querySelectorAll('.menu-item'),function(el){el.onclick=function(){var fn=opts[+el.getAttribute('data-i')][2];closeNewMenu();fn();};});
+  setTimeout(function(){document.addEventListener('click',onDocNewMenu);},0);
 }
 function roleLabel(r){return{admin:'Administrator',co_leader:'Co-Leader',teacher:'Teacher',co_teacher:'Co-Teacher',treasurer:'Treasurer',board_rep:'Board Rep',chairman:'Chairman'}[r]||r;}
 
@@ -668,11 +694,21 @@ function renderDashboard(){
   if(r==='treasurer')return treasurerDash();
   if(r==='board_rep'||r==='chairman')return boardDash();
 }
+function greeting(){var h=new Date().getHours();var g=h<12?'Good morning':(h<17?'Good afternoon':'Good evening');var nm=String(S.me.name||'').split(' ')[0];return g+(nm?', '+esc(nm):'');}
+function quickTiles(){
+  var t=[];
+  if(S.meta.canViewChildren)t.push(['weekly','☀️ This Sunday']);
+  t.push(['mytasks',(S.me.role==='admin'||S.me.role==='co_leader'?'✅ Tasks':'✅ My tasks')+navBadge(openTaskCount())]);
+  t.push(['epics','📅 Events']);
+  return '<div class="grid cards" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:6px 0 18px">'+t.map(function(x){return '<div class="card click" data-jump="'+x[0]+'" style="text-align:center;font-weight:600;padding:18px">'+x[1]+'</div>';}).join('')+'</div>';
+}
+function bindJumps(){Array.prototype.forEach.call(document.querySelectorAll('[data-jump]'),function(c){c.onclick=function(){VIEW=c.getAttribute('data-jump');EPIC=null;render();};});}
 function leaderDash(){
   var overdue=S.tasks.filter(isOverdue);
   var unassigned=S.tasks.filter(function(t){return !String(t.owner).trim();});
   var v=$('#view');
-  v.innerHTML='<div class="row"><h2>Dashboard</h2><div class="flex"><button class="sm" id="notesBtn">📝 Notes → tasks</button><button class="primary" id="newEpic">+ New event</button></div></div>'
+  v.innerHTML='<div class="row"><h2>'+greeting()+'</h2><div class="flex"><button class="sm" id="notesBtn">📝 Notes → tasks</button><button class="primary" id="newEpic">+ New event</button></div></div>'
+   +quickTiles()
    +'<div class="kpis">'
    +kpi(activeEventsCurAy().length,'Events '+ayLabel(curAcademicYear()))+kpi(S.tasks.length,'Tasks')
    +kpi(overdue.length,'Overdue',overdue.length?'var(--bad)':'')+kpi(unassigned.length,'Unassigned',unassigned.length?'var(--warn)':'')
@@ -683,16 +719,18 @@ function leaderDash(){
   $('#newEpic').onclick=function(){openEpicForm();};
   $('#notesBtn').onclick=function(){openNotesModal();};
   renderEpicCards($('#epicCards'));
-  bindTaskRows(true);
+  bindTaskRows(true);bindJumps();
 }
 function doerDash(){
   var mine=myTasks().slice().sort(function(a,b){return (a.due_date||'zzz').localeCompare(b.due_date||'zzz');});
   var open=mine.filter(function(t){return t.status!=='Completed';});
   var v=$('#view');
-  v.innerHTML='<div class="row"><h2>My tasks</h2></div>'
+  v.innerHTML='<div class="row"><h2>'+greeting()+'</h2></div>'
+   +quickTiles()
+   +'<h3 style="margin-bottom:8px">My tasks</h3>'
    +'<div class="kpis">'+kpi(open.length,'To do')+kpi(mine.filter(isOverdue).length,'Overdue',mine.filter(isOverdue).length?'var(--bad)':'')+kpi(mine.filter(function(t){return t.status==='Completed';}).length,'Done')+'</div>'
    +(mine.length?myTaskTable(mine):'<div class="empty">No tasks assigned to you yet. A leader will assign them.</div>');
-  bindMyTaskRows();
+  bindMyTaskRows();bindJumps();
 }
 function treasurerDash(){renderFinances();}
 var FINMODE='expenses';
