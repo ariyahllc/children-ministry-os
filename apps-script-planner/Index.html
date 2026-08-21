@@ -37,17 +37,28 @@
   .spacer{flex:1}
   .me{text-align:right;line-height:1.25}
   .me .nm{font-weight:600;font-size:13px}
-  .nav{display:flex;gap:4px;padding:9px 22px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;position:sticky;top:59px;z-index:4}
-  .nav::-webkit-scrollbar{height:0}
-  .nav button{flex:0 0 auto}
   .navbadge{display:inline-block;min-width:18px;padding:0 5px;height:18px;line-height:18px;text-align:center;font-size:11px;border-radius:999px;background:var(--pri);color:var(--pri-ink);margin-left:5px;vertical-align:middle;font-weight:700}
   .menu{position:fixed;z-index:60;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.22);min-width:180px;padding:5px}
   .menu-item{padding:10px 14px;cursor:pointer;border-radius:8px;font-size:14px;display:flex;gap:9px;align-items:center}
   .menu-item:hover{background:var(--subtle)}
-  .nav button{border:none;background:transparent;border-radius:9px;color:var(--muted);font-weight:500;padding:7px 14px}
-  .nav button:hover{background:var(--subtle);color:var(--ink)}
-  .nav button.active{background:var(--chip);color:var(--chip-ink)}
-  .wrap{max-width:1320px;margin:0 auto;padding:24px 30px}
+  /* layout: left sidebar (desktop) + main; bottom tab bar on mobile */
+  .shell{display:flex;align-items:flex-start}
+  .sidebar{position:sticky;top:59px;height:calc(100vh - 59px);flex:0 0 208px;width:208px;background:var(--card);border-right:1px solid var(--line);padding:12px 10px;overflow-y:auto}
+  .sidebar button{display:flex;align-items:center;gap:11px;width:100%;text-align:left;border:none;background:transparent;border-radius:10px;color:var(--muted);font:inherit;font-weight:500;padding:10px 12px;cursor:pointer;margin-bottom:2px}
+  .sidebar button:hover{background:var(--subtle);color:var(--ink)}
+  .sidebar button.active{background:var(--chip);color:var(--chip-ink);font-weight:600}
+  .sidebar .ic{font-size:16px;width:20px;text-align:center;flex:0 0 auto}
+  .bottomnav{display:none}
+  .wrap{flex:1;min-width:0;max-width:1120px;margin:0 auto;padding:24px 30px}
+  @media(max-width:900px){
+    .sidebar{display:none}
+    .wrap{padding:18px 16px 84px}
+    .bottomnav{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--card);border-top:1px solid var(--line);padding:5px 4px;box-shadow:0 -2px 10px var(--shadow)}
+    .bottomnav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;border:none;background:transparent;color:var(--muted);font:inherit;font-size:11px;padding:5px 2px;cursor:pointer}
+    .bottomnav button.active{color:var(--pri)}
+    .bottomnav .ic{font-size:19px;position:relative;line-height:1}
+    .tabbadge{position:absolute;top:-5px;left:11px;min-width:15px;height:15px;line-height:15px;padding:0 3px;font-size:9px;font-weight:700;border-radius:999px;background:var(--pri);color:var(--pri-ink)}
+  }
   .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
   h2{font-family:'Fraunces',Georgia,serif;font-size:26px;margin:0;letter-spacing:-.01em;font-weight:600}
   h3{font-family:'Fraunces',Georgia,serif;font-size:17px;margin:0 0 8px;font-weight:600}
@@ -228,33 +239,52 @@ function openTaskCount(){
   return t.filter(function(x){return x.status!=='Completed'&&(S.me.role==='admin'||S.me.role==='co_leader'?true:String(x.owner)===String(S.me.name));}).length;
 }
 function navBadge(n){return n>0?' <span class="navbadge">'+n+'</span>':'';}
-function navFor(role){
-  var items=[['dashboard','Dashboard']];
-  if(S.meta.canViewChildren)items.push(['weekly','This Sunday']);
+var NAV_ICON={dashboard:'🏠',weekly:'☀️',mytasks:'✅',epics:'📅',children:'🧒',finances:'💰',members:'👥'};
+function navItems(){
+  var role=S.me.role,it=[];
+  function add(k,l){it.push({key:k,label:l,icon:NAV_ICON[k]||'•',badge:0});}
+  add('dashboard','Dashboard');
+  if(S.meta.canViewChildren)add('weekly','This Sunday');
   var tc=openTaskCount();
-  if(role==='admin'||role==='co_leader')items.push(['mytasks','Tasks'+navBadge(tc)]);
-  else if(role==='treasurer'||role==='board_rep'||role==='chairman')items.push(['mytasks','My tasks'+navBadge(tc)]);
-  items.push(['epics','Events']);
-  if(S.meta.canViewRoster)items.push(['children','Children']);
-  if(S.meta.canViewFinances&&role!=='treasurer')items.push(['finances','Finances']);
-  if(S.meta.canViewMembers)items.push(['members','Members']);
-  return items;
+  if(role==='admin'||role==='co_leader')it.push({key:'mytasks',label:'Tasks',icon:NAV_ICON.mytasks,badge:tc});
+  else if(role==='treasurer'||role==='board_rep'||role==='chairman')it.push({key:'mytasks',label:'My tasks',icon:NAV_ICON.mytasks,badge:tc});
+  add('epics','Events');
+  if(S.meta.canViewRoster)add('children','Children');
+  if(S.meta.canViewFinances&&role!=='treasurer')add('finances','Finances');
+  if(S.meta.canViewMembers)add('members','Members');
+  return it;
+}
+function openMoreMenu(btn){
+  if(document.getElementById('moreMenu')){document.getElementById('moreMenu').remove();return;}
+  var items=navItems().slice(4);
+  var m=document.createElement('div');m.id='moreMenu';m.className='menu';
+  m.innerHTML=items.map(function(it){return '<div class="menu-item" data-v="'+it.key+'"><span>'+it.icon+'</span> '+esc(it.label)+navBadge(it.badge)+'</div>';}).join('');
+  document.body.appendChild(m);
+  var r=btn.getBoundingClientRect();m.style.bottom=(window.innerHeight-r.top+6)+'px';m.style.right='10px';
+  Array.prototype.forEach.call(m.querySelectorAll('[data-v]'),function(el){el.onclick=function(){VIEW=el.getAttribute('data-v');EPIC=null;m.remove();render();};});
+  setTimeout(function(){document.addEventListener('click',function h(e){var mm=document.getElementById('moreMenu');if(mm&&!mm.contains(e.target)&&e.target.id!=='moreTab'){mm.remove();document.removeEventListener('click',h);}});},0);
 }
 function render(){
   var me=S.me;
-  var nav=navFor(me.role).map(function(n){return '<button data-v="'+n[0]+'" class="'+(VIEW===n[0]?'active':'')+'">'+n[1]+'</button>';}).join('');
+  var items=navItems();
+  var primary=items.slice(0,4),more=items.slice(4);
+  function sideBtn(it){return '<button data-v="'+it.key+'" class="'+(VIEW===it.key?'active':'')+'"><span class="ic">'+it.icon+'</span><span class="lbl">'+esc(it.label)+navBadge(it.badge)+'</span></button>';}
+  function tabBtn(it){return '<button data-v="'+it.key+'" class="'+(VIEW===it.key?'active':'')+'"><span class="ic">'+it.icon+(it.badge>0?'<span class="tabbadge">'+(it.badge>99?'99+':it.badge)+'</span>':'')+'</span><span>'+esc(it.label)+'</span></button>';}
+  var sidebar='<nav class="sidebar">'+items.map(sideBtn).join('')+'</nav>';
+  var bottom='<nav class="bottomnav">'+primary.map(tabBtn).join('')+(more.length?'<button id="moreTab" class="'+(more.some(function(x){return x.key===VIEW;})?'active':'')+'"><span class="ic">⋯</span><span>More</span></button>':'')+'</nav>';
   $('#root').innerHTML=
     '<div class="topbar"><div class="brand"><span class="dot">✝</span> CM Planner</div><div class="spacer"></div>'
     +(S.meta.canManageEpics?'<button class="primary sm" id="globalNew" style="margin-right:10px">＋ New</button>':'')
     +'<button class="sm" id="theme" title="Toggle light / dark" style="margin-right:10px">'+(currentTheme()==='dark'?'☀':'🌙')+'</button>'
     +'<div class="me"><div class="nm">'+esc(me.name)+'</div><div class="chip">'+esc(roleLabel(me.role))+'</div></div>'
     +'<button class="sm" id="signout" style="margin-left:10px">Sign out</button></div>'
-    +'<div class="nav">'+nav+'</div>'
-    +'<div class="wrap" id="view"></div>';
+    +'<div class="shell">'+sidebar+'<div class="wrap" id="view"></div></div>'
+    +bottom;
   var so=$('#signout'); if(so)so.onclick=signOut;
   var th=$('#theme'); if(th)th.onclick=toggleTheme;
   var gn=$('#globalNew'); if(gn)gn.onclick=function(e){e.stopPropagation();openNewMenu(gn);};
-  Array.prototype.forEach.call(document.querySelectorAll('.nav button'),function(b){b.onclick=function(){VIEW=b.getAttribute('data-v');EPIC=null;render();};});
+  var mt=$('#moreTab'); if(mt)mt.onclick=function(e){e.stopPropagation();openMoreMenu(mt);};
+  Array.prototype.forEach.call(document.querySelectorAll('[data-v]'),function(b){b.onclick=function(){VIEW=b.getAttribute('data-v');EPIC=null;render();};});
   renderView();
   mountDorothy();
 }
