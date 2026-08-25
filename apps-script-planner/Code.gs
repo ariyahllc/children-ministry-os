@@ -100,10 +100,21 @@ function doGet(e) {
   // Personal invite token from the ?k=… link, injected into the page so the
   // sandboxed client can read it (the iframe can't see the top-level query).
   t.inviteToken = (e && e.parameter && e.parameter.k) ? String(e.parameter.k) : '';
-  return t.evaluate()
-    .setTitle("Children's Ministry Planner")
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL); // allow Google Sites embed
+  var out = t.evaluate()
+    .setTitle('CM Planner') // short name → the "Add to Home Screen" app label
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
+    .addMetaTag('mobile-web-app-capable', 'yes')
+    .addMetaTag('apple-mobile-web-app-capable', 'yes')
+    .addMetaTag('apple-mobile-web-app-title', 'CM Planner')
+    .addMetaTag('apple-mobile-web-app-status-bar-style', 'black-translucent')
+    .addMetaTag('theme-color', '#1f4d39')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  // On-brand home-screen icon (green rounded square + white cross). Guarded: if the
+  // platform rejects a data-URI favicon, the app still loads (just no custom icon).
+  try {
+    out.setFaviconUrl("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%231f4d39'/><path d='M28 13h8v13h13v8H36v17h-8V34H15v-8h13z' fill='%23fbfdf9'/></svg>");
+  } catch (e) {}
+  return out;
 }
 
 /* ------------------------------------------------------------- spreadsheet */
