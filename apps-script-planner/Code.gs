@@ -102,11 +102,7 @@ function doGet(e) {
   t.inviteToken = (e && e.parameter && e.parameter.k) ? String(e.parameter.k) : '';
   var out = t.evaluate()
     .setTitle('CM Planner') // short name → the "Add to Home Screen" app label
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover')
-    .addMetaTag('mobile-web-app-capable', 'yes')
-    .addMetaTag('apple-mobile-web-app-capable', 'yes')
-    .addMetaTag('apple-mobile-web-app-title', 'CM Planner')
-    .addMetaTag('apple-mobile-web-app-status-bar-style', 'black-translucent')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   // On-brand home-screen icon (green rounded square + white cross). Guarded: if the
   // platform rejects a data-URI favicon, the app still loads (just no custom icon).
