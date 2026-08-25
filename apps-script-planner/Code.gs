@@ -107,7 +107,6 @@ function doGet(e) {
     .addMetaTag('apple-mobile-web-app-capable', 'yes')
     .addMetaTag('apple-mobile-web-app-title', 'CM Planner')
     .addMetaTag('apple-mobile-web-app-status-bar-style', 'black-translucent')
-    .addMetaTag('theme-color', '#1f4d39')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   // On-brand home-screen icon (green rounded square + white cross). Guarded: if the
   // platform rejects a data-URI favicon, the app still loads (just no custom icon).
