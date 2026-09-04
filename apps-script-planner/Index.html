@@ -102,6 +102,9 @@
   .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px;box-shadow:0 1px 3px var(--shadow)}
   .kpi b{font-family:'Fraunces',Georgia,serif;font-size:26px;display:block}
   .flex{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .flex.toolbar #evSearch{flex:1 1 120px;min-width:0;max-width:none}
+  .flex.toolbar label{white-space:nowrap}
+  @media(min-width:700px){.flex.toolbar{flex-wrap:nowrap}}
   .attrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px solid var(--line);border-radius:11px;margin-bottom:8px;cursor:pointer;user-select:none;font-weight:500;transition:.12s}
   .attrow:hover{border-color:var(--muted)}
   .attrow.on{background:var(--chip);border-color:var(--pri2);color:var(--chip-ink)}
@@ -1037,9 +1040,9 @@ function renderEpics(){
   var ayList=Object.keys(ays).map(Number).sort(function(a,b){return a-b;});
   if(CALYEAR==null||ayList.indexOf(CALYEAR)<0)CALYEAR=(ayList.indexOf(curAy)>=0?curAy:ayList[0]);
   var seg='<div class="seg"><button data-cm="calendar" class="'+(CALMODE==='calendar'?'on':'')+'">Calendar</button><button data-cm="events" class="'+(CALMODE==='events'?'on':'')+'">Events</button></div>';
-  v.innerHTML='<div class="row"><h2>'+(CALMODE==='events'?'Events':'Calendar of events')+'</h2><div class="flex">'
+  v.innerHTML='<div class="row"><h2>'+(CALMODE==='events'?'Events':'Calendar of events')+'</h2><div class="flex toolbar">'
     +seg
-    +'<input id="evSearch" placeholder="🔎 Search all events…" value="'+esc(EVENT_SEARCH)+'" style="max-width:220px">'
+    +'<input id="evSearch" placeholder="🔎 Search all events…" value="'+esc(EVENT_SEARCH)+'">'
     +'<select id="ayPick" style="width:auto">'+ayList.map(function(y){return '<option value="'+y+'"'+(y===CALYEAR?' selected':'')+'>'+ayLabel(y)+'</option>';}).join('')+'</select>'
     +'<label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showArch" style="width:auto"'+(SHOW_ARCHIVED?' checked':'')+'> show archived</label>'
     +(lead?'<button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button>':'')
