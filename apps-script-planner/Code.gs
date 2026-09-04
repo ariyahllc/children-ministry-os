@@ -36,11 +36,11 @@ const TABS = {
 
 const SCHEMA = {
   Members:  ['email', 'name', 'role', 'token', 'class'],
-  Events:   ['id', 'name', 'type', 'event_date', 'status', 'notes', 'program', 'archived', 'no_school'],
+  Events:   ['id', 'name', 'type', 'event_date', 'status', 'notes', 'program', 'archived', 'no_school', 'month'],
   Tasks:    ['id', 'epic_id', 'title', 'owner', 'due_offset', 'due_date', 'status', 'priority', 'notes'],
   Expenses: ['id', 'epic_id', 'item', 'category', 'amount', 'status', 'notes', 'date', 'paid_by', 'reimbursed', 'receipt_url', 'budget_category'],
   Budgets: ['id', 'fy', 'category', 'amount', 'notes'],
-  Forms: ['id', 'epic_id', 'title', 'published_url', 'edit_url', 'sheet_url', 'created'],
+  Forms: ['id', 'epic_id', 'title', 'published_url', 'edit_url', 'sheet_url', 'created', 'kind'],
   TimeOff: ['id', 'member', 'start', 'end', 'note'],
   Feedback: ['id', 'epic_id', 'text', 'converted', 'converted_task_id'],
   // Column A is id (backfilled); columns B..N match the user's Children list; class is last.
@@ -516,9 +516,17 @@ function getBootstrap(token) {
   const showBudget = LEADERS.indexOf(me.role) >= 0 || me.role === 'treasurer' || OBSERVERS.indexOf(me.role) >= 0;
   const budget = showBudget ? readTable_(TABS.BUDGET).map(sanitizeRow_) : [];
   const budgetPlan = showBudget ? readTable_(TABS.BUDGETPLAN).map(sanitizeRow_) : [];
-  const formCounts = {}; readTable_(TABS.FORMS).forEach(function (f) { formCounts[f.epic_id] = (formCounts[f.epic_id] || 0) + 1; });
+  const formCounts = {}, feedbackFormCounts = {};
+  readTable_(TABS.FORMS).forEach(function (f) {
+    if (String(f.kind || 'registration') === 'feedback') feedbackFormCounts[f.epic_id] = (feedbackFormCounts[f.epic_id] || 0) + 1;
+    else formCounts[f.epic_id] = (formCounts[f.epic_id] || 0) + 1;
+  });
   const timeoff = readTable_(TABS.TIMEOFF).map(r => ({ id: r.id, member: r.member, start: fmtDate_(r.start), end: fmtDate_(r.end), note: r.note || '' }));
   const feedback = readTable_(TABS.FEEDBACK).map(sanitizeRow_);
+  // Per-Sunday notes (announcements) for the calendar — leaders only. Keyed by date.
+  const canLead_ = LEADERS.indexOf(me.role) >= 0;
+  const announcements = {};
+  if (canLead_) readTable_(TABS.ANNOUNCEMENTS).forEach(function (a) { var d = fmtDate_(a.date); if (d) announcements[d] = { notes: a.notes || '', slides_link: a.slides_link || '' }; });
 
   return {
     access: true,
@@ -530,6 +538,8 @@ function getBootstrap(token) {
     budget: budget,
     budgetPlan: budgetPlan,
     formCounts: formCounts,
+    feedbackFormCounts: feedbackFormCounts,
+    announcements: announcements,
     timeoff: timeoff,
     feedback: feedback,
     meta: {
@@ -560,6 +570,7 @@ function saveEpic(token, data) {
     program: data.program || '',
     type: data.type || 'Other',
     event_date: fmtDate_(data.event_date),
+    month: String(data.month || '').trim().slice(0, 7), // 'YYYY-MM' for month-only events (no exact date yet)
     status: data.status || 'Planning',
     notes: data.notes || '',
     no_school: data.no_school ? 'yes' : '',
@@ -829,6 +840,14 @@ function addRoutedTasks(token, tasks) {
 function setEventArchived(token, id, archived) {
   requireLeader_(token);
   return updateRow_(TABS.EPICS, id, { archived: archived ? 'yes' : '' });
+}
+
+// Manual completion: an event is "complete" only when a leader marks it so — never by
+// date. The event stays on the Events tab (so follow-up tasks like feedback/media are
+// still visible) until it is archived separately.
+function setEventComplete(token, id, done) {
+  requireLeader_(token);
+  return updateRow_(TABS.EPICS, id, { status: done ? 'Completed' : 'In Progress' });
 }
 
 // Leaders: archive every event that's complete (all tasks done, or no tasks + date passed).
@@ -1137,6 +1156,7 @@ function deleteSundayPhoto(token, date, cls, fileId) {
 // Per-event media (Photos + Videos). Edit + view = leaders + teachers/co-teachers.
 function eventById_(id) { return readTable_(TABS.EPICS).find(function (e) { return String(e.id) === String(id); }); }
 function eventFolder_(ev, kind) { return mediaFolder_(['Events', String(ev.name || 'event').slice(0, 80) + ' #' + String(ev.id).slice(-6), (kind === 'Videos' ? 'Videos' : 'Photos')]); }
+function eventFormsFolder_(ev) { return mediaFolder_(['Events', String(ev.name || 'event').slice(0, 80) + ' #' + String(ev.id).slice(-6), 'Forms']); }
 function canUseEventMedia_(me) { return LEADERS.indexOf(me.role) >= 0 || DOERS.indexOf(me.role) >= 0; }
 function getEventMedia(token, eventId) {
   var me = requireMember_(token); if (!canUseEventMedia_(me)) throw new Error('NOT_ALLOWED');
@@ -1186,10 +1206,34 @@ function createEventForm(token, eventId, title) {
   form.addParagraphTextItem().setTitle('Comments');
   var ss = SpreadsheetApp.create(title + ' (Responses)');
   form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
-  var folder = mediaFolder_(['Forms']);
+  var folder = eventFormsFolder_(ev);
   try { DriveApp.getFileById(form.getId()).moveTo(folder); } catch (e) {}
   try { DriveApp.getFileById(ss.getId()).moveTo(folder); } catch (e) {}
-  var row = { id: uuid_(), epic_id: eventId, title: title, published_url: form.getPublishedUrl(), edit_url: form.getEditUrl(), sheet_url: ss.getUrl(), created: fmtDate_(new Date()) };
+  var row = { id: uuid_(), epic_id: eventId, title: title, published_url: form.getPublishedUrl(), edit_url: form.getEditUrl(), sheet_url: ss.getUrl(), created: fmtDate_(new Date()), kind: 'registration' };
+  insert_(TABS.FORMS, row);
+  return row;
+}
+// Feedback form per event: a Google Form + its own responses Sheet, saved in the event's
+// Drive folder (same place as its photos/videos). Anonymous submissions allowed.
+function createEventFeedbackForm(token, eventId, title) {
+  requireLeader_(token);
+  var ev = eventById_(eventId); if (!ev) throw new Error('Event not found');
+  title = String(title || '').trim() || ('Feedback — ' + ev.name);
+  var form = FormApp.create(title);
+  form.setDescription('Feedback for ' + ev.name + (ev.event_date ? ' (' + fmtDate_(ev.event_date) + ')' : '') + '. Thank you for helping us improve!');
+  form.setCollectEmail(false);
+  try { form.setRequireLogin(false); } catch (e) {}
+  form.addScaleItem().setTitle('Overall, how would you rate this event?').setBounds(1, 5).setLabels('Poor', 'Excellent').setRequired(true);
+  form.addParagraphTextItem().setTitle('What went well?');
+  form.addParagraphTextItem().setTitle('What could we improve?');
+  form.addTextItem().setTitle('Your name (optional)');
+  form.addParagraphTextItem().setTitle('Any other comments');
+  var ss = SpreadsheetApp.create(title + ' (Responses)');
+  form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+  var folder = eventFormsFolder_(ev);
+  try { DriveApp.getFileById(form.getId()).moveTo(folder); } catch (e) {}
+  try { DriveApp.getFileById(ss.getId()).moveTo(folder); } catch (e) {}
+  var row = { id: uuid_(), epic_id: eventId, title: title, published_url: form.getPublishedUrl(), edit_url: form.getEditUrl(), sheet_url: ss.getUrl(), created: fmtDate_(new Date()), kind: 'feedback' };
   insert_(TABS.FORMS, row);
   return row;
 }
@@ -1198,7 +1242,7 @@ function getEventForms(token, eventId) {
   if (LEADERS.indexOf(me.role) < 0 && DOERS.indexOf(me.role) < 0) throw new Error('NOT_ALLOWED');
   // cheap: just the stored links (no FormApp open). Response counts live in the linked sheet.
   return readTable_(TABS.FORMS).filter(function (f) { return String(f.epic_id) === String(eventId); })
-    .map(function (f) { return { id: f.id, title: f.title, published_url: f.published_url, edit_url: f.edit_url, sheet_url: f.sheet_url, created: fmtDate_(f.created) }; });
+    .map(function (f) { return { id: f.id, title: f.title, published_url: f.published_url, edit_url: f.edit_url, sheet_url: f.sheet_url, created: fmtDate_(f.created), kind: f.kind || 'registration' }; });
 }
 function getFormResponses(token, formId) {
   var me = requireMember_(token);
@@ -1366,19 +1410,13 @@ function getBirthdays(token, ayStart) {
   return out;
 }
 function archiveCompleted() {
+  // Completion is manual now (an event's status is only "Completed" when a leader marked
+  // it so). Tidy = archive every event that has been marked complete.
   var events = readTable_(TABS.EPICS);
-  var tasks = readTable_(TABS.TASKS);
-  var byEpic = {};
-  tasks.forEach(function (t) { (byEpic[t.epic_id] = byEpic[t.epic_id] || []).push(t); });
   var n = 0;
   events.forEach(function (e) {
     if (String(e.archived || '').trim()) return;
-    var ts = byEpic[e.id] || [];
-    // Only archive events that had real work and finished it. A no-task event is a
-    // calendar marker / awareness item (e.g. Harvest Festival) or imported history —
-    // never auto-archive those; the Archive button handles them on purpose.
-    if (!ts.length) return;
-    if (ts.every(function (t) { return t.status === 'Completed'; })) { updateRow_(TABS.EPICS, e.id, { archived: 'yes' }); n++; }
+    if (String(e.status || '').trim().toLowerCase() === 'completed') { updateRow_(TABS.EPICS, e.id, { archived: 'yes' }); n++; }
   });
   return 'Archived ' + n + ' completed event(s).';
 }

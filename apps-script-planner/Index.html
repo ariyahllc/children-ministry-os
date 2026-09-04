@@ -705,7 +705,7 @@ function openChildForm(c){
 function tasksForEpic(id){return S.tasks.filter(function(t){return String(t.epic_id)===String(id);});}
 function epicProgress(id){var ts=tasksForEpic(id);var done=ts.filter(function(t){return t.status==='Completed';}).length;return{done:done,total:ts.length,pct:ts.length?Math.round(done*100/ts.length):0};}
 // Derived completion: has tasks -> all done; no tasks -> complete once its date has passed (a brand-new undated/future no-task event is NOT complete yet).
-function eventComplete(e){var p=epicProgress(e.id);if(p.total>0)return p.done===p.total;var d=parseD(e.event_date);return !!(d&&d<today());}
+function eventComplete(e){return String(e.status||'').trim().toLowerCase()==='completed';}
 function isOverdue(t){return t.status!=='Completed' && (function(){var d=parseD(t.due_date);return d&&d<today();})();}
 function myTasks(){var nm=String(S.me.name||'').toLowerCase();var fn=nm.split(' ')[0];return S.tasks.filter(function(t){var o=String(t.owner||'').toLowerCase();return o===nm||(fn.length>1&&o.indexOf(fn)>=0);});}
 
@@ -991,12 +991,15 @@ function eventCard(e){
   return '<div class="card click" data-e="'+esc(e.id)+'"'+(arch?' style="opacity:.55"':'')+'>'
     +'<div class="flex" style="justify-content:space-between"><span class="chip">'+esc(e.program||'—')+'</span><span class="small '+bcls+'">'+badge+'</span></div>'
     +'<h3 style="margin:8px 0 4px">'+esc(e.name)+formBadge(e.id)+'</h3>'
-    +'<div class="small muted">'+esc(e.event_date||'no date')+' · '+esc(e.status||'')+'</div>'
+    +'<div class="small muted">'+esc(e.event_date||(e.month?('📌 '+e.month):'no date'))+' · '+esc(e.status||'')+'</div>'
     +'<div class="bar" style="margin-top:10px"><i style="width:'+p.pct+'%"></i></div>'
     +'<div class="small muted" style="margin-top:4px">'+p.done+'/'+p.total+' tasks done</div>'
     +'</div>';
 }
-function formBadge(id){var n=(S.formCounts||{})[id]||0;return n?' <span class="chip" style="background:#e7eef7;color:#1b6cb0" title="'+n+' registration form'+(n===1?'':'s')+'">📋 '+n+'</span>':'';}
+function formBadge(id){var r=(S.formCounts||{})[id]||0,f=(S.feedbackFormCounts||{})[id]||0,out='';
+  if(r)out+=' <span class="chip" style="background:#e7eef7;color:#1b6cb0" title="'+r+' registration form'+(r===1?'':'s')+'">📋 '+r+'</span>';
+  if(f)out+=' <span class="chip" style="background:#eaf7ee;color:#1b7a3d" title="'+f+' feedback form'+(f===1?'':'s')+'">💬 '+f+'</span>';
+  return out;}
 function renderEpicCards(container,readonly){
   var list=activeEventsCurAy();
   if(!list.length){container.className='';container.innerHTML='<div class="empty">No events yet.</div>';return;}
@@ -1024,6 +1027,7 @@ var CALYEAR=null;
 function ayOf(dstr){var m=String(dstr).match(/^(\d{4})-(\d{2})/);if(!m)return null;var y=+m[1],mo=+m[2];return mo>=7?y:y-1;}
 function ayLabel(y){return y+'–'+String(y+1).slice(2);} // 2026–27
 var CALMODE='calendar';
+var EVENT_SEARCH='';
 var TASKS_SHOW_DONE=false;
 var TASK_SEARCH='',TASK_OWNER='__all';
 function renderEpics(){
@@ -1035,16 +1039,19 @@ function renderEpics(){
   var seg='<div class="seg"><button data-cm="calendar" class="'+(CALMODE==='calendar'?'on':'')+'">Calendar</button><button data-cm="events" class="'+(CALMODE==='events'?'on':'')+'">Events</button></div>';
   v.innerHTML='<div class="row"><h2>'+(CALMODE==='events'?'Events':'Calendar of events')+'</h2><div class="flex">'
     +seg
+    +'<input id="evSearch" placeholder="🔎 Search all events…" value="'+esc(EVENT_SEARCH)+'" style="max-width:220px">'
     +'<select id="ayPick" style="width:auto">'+ayList.map(function(y){return '<option value="'+y+'"'+(y===CALYEAR?' selected':'')+'>'+ayLabel(y)+'</option>';}).join('')+'</select>'
     +'<label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showArch" style="width:auto"'+(SHOW_ARCHIVED?' checked':'')+'> show archived</label>'
     +(lead?'<button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button><button class="primary" id="newEpic">+ New event</button>':'')
     +'</div></div><div id="progBody"></div>';
   if(lead)$('#newEpic').onclick=function(){openEpicForm();};
   if(lead){var pb=$('#ptoBtn');if(pb)pb.onclick=openTimeOff;}
-  if(lead)$('#tidyE').onclick=function(){confirmDo('Archive every completed event (all tasks done, or no tasks and the date has passed)?',function(){return api('tidyCompleted');},'Tidied');};
+  if(lead)$('#tidyE').onclick=function(){confirmDo('Archive every event marked complete?',function(){return api('tidyCompleted');},'Tidied');};
   var sa=$('#showArch');if(sa)sa.onchange=function(){SHOW_ARCHIVED=this.checked;renderEpics();};
   var ap=$('#ayPick');if(ap)ap.onchange=function(){CALYEAR=+this.value;renderEpics();};
   Array.prototype.forEach.call(v.querySelectorAll('.seg button'),function(b){b.onclick=function(){CALMODE=b.getAttribute('data-cm');renderEpics();};});
+  var es=$('#evSearch');if(es)es.oninput=function(){EVENT_SEARCH=this.value;if(EVENT_SEARCH.trim())renderEventSearch($('#progBody'));else renderEpics();};
+  if(EVENT_SEARCH.trim()){renderEventSearch($('#progBody'));return;}
   if(CALMODE==='events'){renderEventsByProgram($('#progBody'));return;}
   // A late-arriving birthday fetch must not repaint the calendar if the user has since
   // switched to Events (or left the view entirely) — guard on current mode + panel.
@@ -1055,6 +1062,16 @@ function renderEpics(){
   } else { renderEventsByDate($('#progBody')); }
 }
 var BIRTHDAYS=[],BDAY_AY=null;
+function renderEventSearch(container){
+  var q=EVENT_SEARCH.trim().toLowerCase();
+  var list=S.epics.filter(function(e){
+    if(String(e.name||'').trim().toLowerCase()==='sunday school')return false; // per-Sunday buckets aren't events
+    return [e.name,e.program,e.notes,e.status,e.event_date,e.month].join(' ').toLowerCase().indexOf(q)>=0;
+  }).sort(function(a,b){return String(b.event_date||b.month||'').localeCompare(String(a.event_date||a.month||''));});
+  if(!list.length){container.innerHTML='<div class="empty">No events match "'+esc(EVENT_SEARCH)+'".</div>';return;}
+  container.innerHTML='<div class="small muted" style="margin:4px 0 10px">'+list.length+' match'+(list.length===1?'':'es')+' — includes completed &amp; archived</div><div class="grid cards">'+list.map(eventCard).join('')+'</div>';
+  Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+}
 function renderEventsByDate(container){
   function pad(n){return (n<10?'0':'')+n;}
   function parse(s){var m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?new Date(+m[1],+m[2]-1,+m[3]):null;}
@@ -1065,6 +1082,9 @@ function renderEventsByDate(container){
   var evAll=SHOW_ARCHIVED?S.epics.slice():activeEvents();
   var dated=evAll.filter(function(e){var d=e.event_date?parse(e.event_date):null;return d&&d>=start&&d<=end;});
   var undated=evAll.filter(function(e){return !e.event_date;});
+  // Month-only events (no exact date yet) — pinned to the top of their month.
+  var monthEv={};evAll.forEach(function(e){if(!e.event_date&&e.month&&String(e.name||'').trim().toLowerCase()!=='sunday school'){var mk=String(e.month).slice(0,7);(monthEv[mk]=monthEv[mk]||[]).push(e);}});
+  var leadA=S.meta.canManageEpics;
   // "Sunday School" events are the per-Sunday task buckets — don't render them as
   // separate rows; instead they hang off that Sunday's own line (with a task count).
   // Sunday School buckets are managed from the Tasks tab, not shown per-Sunday on the calendar.
@@ -1081,15 +1101,23 @@ function renderEventsByDate(container){
   var html='',curMo='';
   keys.forEach(function(k){
     var dt=parse(k);if(!dt)return;var mo=k.slice(0,7);
-    if(mo!==curMo){if(curMo)html+='</tbody></table>';curMo=mo;html+='<h3 style="margin:16px 0 8px">'+MON[dt.getMonth()]+' '+dt.getFullYear()+'</h3><table><tbody>';}
+    if(mo!==curMo){if(curMo)html+='</tbody></table>';curMo=mo;
+      html+='<h3 style="margin:16px 0 8px">'+MON[dt.getMonth()]+' '+dt.getFullYear()+'</h3>';
+      var mev=monthEv[mo]||[];
+      if(mev.length)html+='<div class="card" style="margin:0 0 8px;padding:9px 12px"><div class="small muted" style="margin-bottom:3px">📌 This month</div>'+mev.map(function(e){return '<div class="mev" data-e="'+esc(e.id)+'" style="cursor:pointer;padding:2px 0"><span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':'')+'</div>';}).join('')+'</div>';
+      html+='<table><tbody>';}
     var evs=evByDate[k]||[];
     var isSun=dt.getDay()===0;
     var noSS=evs.some(function(e){return String(e.no_school||'')==='yes' || /no\s+(sunday school|child)/i.test(String(e.notes||''));});
     var label=DOW[dt.getDay()]+' '+MON[dt.getMonth()].slice(0,3)+' '+dt.getDate();
     var cells=[];
-    if(isSun)cells.push(noSS
-      ?{html:'<span class="pill p-Pending">No Sunday school</span>',id:null}
-      :{html:'<span class="muted">Regular Sunday school class</span>',id:null});
+    if(isSun){
+      var ann=(S.announcements||{})[k]||{};
+      var base=noSS?'<span class="pill p-Pending">No Sunday school</span>':'<span class="muted">Regular Sunday school class</span>';
+      var noteHtml=ann.notes?' <span class="small" style="color:var(--muted)">· '+esc(ann.notes)+'</span>':'';
+      var editHtml=leadA?' <a data-annd="'+esc(k)+'" class="small" style="cursor:pointer">'+(ann.notes?'✎':'+ note')+'</a>':'';
+      cells.push({html:base+noteHtml+editHtml,id:null});
+    }
     evs.forEach(function(e){cells.push({html:'<span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':''),id:e.id});});
     if(bday[k]&&bday[k].length){var bn=bday[k].map(function(bb){return esc(bb.name)+(leaderV&&bb.class?' <span class="muted">('+esc(bb.class)+')</span>':'');}).join(', ');cells.push({html:'<span style="color:var(--gold)">🎂 '+(bday[k].length>1?'Birthdays':'Birthday')+': '+bn+'</span>',id:null});}
     var away=(S.timeoff||[]).filter(function(p){return p.start&&p.member&&String(k)>=String(p.start)&&String(k)<=String(p.end||p.start);}).map(function(p){return esc(p.member)+(p.note?' <span class="muted">('+esc(p.note)+')</span>':'');});
@@ -1105,7 +1133,17 @@ function renderEventsByDate(container){
   container.innerHTML=html;
   Array.prototype.forEach.call(container.querySelectorAll('tr[data-e]'),function(tr){tr.onclick=function(){EPIC=tr.getAttribute('data-e');render();};});
   Array.prototype.forEach.call(container.querySelectorAll('tr[data-sun]'),function(tr){tr.onclick=function(){openSundaySchoolFor(tr.getAttribute('data-sun'));};});
+  Array.prototype.forEach.call(container.querySelectorAll('.mev[data-e]'),function(el){el.onclick=function(ev){ev.stopPropagation();EPIC=el.getAttribute('data-e');render();};});
+  Array.prototype.forEach.call(container.querySelectorAll('[data-annd]'),function(a){a.onclick=function(ev){ev.stopPropagation();openSundayNote(a.getAttribute('data-annd'));};});
   Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+}
+function openSundayNote(date){
+  var ann=(S.announcements||{})[date]||{};
+  modal('Note for '+date,[
+    {name:'notes',label:'Sunday note / announcement',type:'textarea',value:ann.notes||''},
+  ],function(o){return api('saveAnnouncement',date,ann.slides_link||'',o.notes).then(function(){
+    S.announcements=S.announcements||{};S.announcements[date]={notes:o.notes,slides_link:ann.slides_link||''};toast('Saved');renderEpics();
+  });});
 }
 function openSundaySchoolFor(date){
   api('openSundaySchool',date).then(function(id){
@@ -1207,7 +1245,7 @@ function renderEpicDetail(){
   v.innerHTML='<div class="row"><div><a id="back">← Back</a><h2 style="margin-top:6px">'+esc(e.name)+'</h2>'
     +'<div class="small muted">'+(e.program?esc(e.program)+' · ':'')+esc(e.event_date||'no date')+' · '+esc(e.status||'')+' · '+chip+(e.no_school==='yes'?' · <span class="pill p-Pending">No Sunday school</span>':'')+'</div></div>'
     +'<div class="flex">'
-    +(lead?'<button id="editE" class="sm">Edit</button><button id="flyerE" class="sm">🎨 Flyer</button><button id="cloneE" class="sm">Clone</button><button id="archE" class="sm">'+(String(e.archived||'').trim()?'Unarchive':'Archive')+'</button><button id="delE" class="sm danger">Delete</button>':'')
+    +(lead?'<button id="doneE" class="sm">'+(done?'↩ Reopen':'✓ Mark complete')+'</button><button id="editE" class="sm">Edit</button><button id="flyerE" class="sm">🎨 Flyer</button><button id="cloneE" class="sm">Clone</button><button id="archE" class="sm">'+(String(e.archived||'').trim()?'Unarchive':'Archive')+'</button><button id="delE" class="sm danger">Delete</button>':'')
     +(lead&&String(e.name||'').trim().toLowerCase()==='sunday school'?'<button id="noSch" class="sm">'+(String(e.status||'').toLowerCase()==='no school'?'Mark: class is on':'Mark: no class this week')+'</button>':'')
     +'</div></div>'
     +'<div class="bar"><i style="width:'+p.pct+'%"></i></div><div class="small muted" style="margin:4px 0 16px">'+p.done+'/'+p.total+' done</div>'
@@ -1225,6 +1263,7 @@ function renderEpicDetail(){
     var fl=$('#flyerE');if(fl)fl.onclick=function(){openFlyer(e);};
     $('#delE').onclick=function(){confirmDo('Delete event "'+e.name+'" and all its tasks?',function(){return api('deleteEpic',e.id);},'Event deleted',function(){EPIC=null;});};
     $('#archE').onclick=function(){var toArch=!String(e.archived||'').trim();confirmDo((toArch?'Archive':'Unarchive')+' "'+e.name+'"?',function(){return api('setEventArchived',e.id,toArch);},toArch?'Archived':'Unarchived',function(){EPIC=null;});};
+    var de=$('#doneE');if(de)de.onclick=function(){var nd=!eventComplete(e);confirmDo(nd?'Mark "'+e.name+'" complete? It stays on the Events tab (with its tasks, feedback and media) until you archive it.':'Reopen "'+e.name+'"?',function(){return api('setEventComplete',e.id,nd);},nd?'Marked complete':'Reopened');};
     $('#newT').onclick=function(){openTaskForm(e.id);};
     var ns=$('#noSch');if(ns)ns.onclick=function(){var on=String(e.status||'').toLowerCase()!=='no school';confirmDo(on?'Mark this Sunday as NO Sunday School?':'Mark class back on for this Sunday?',function(){return api('setSundayNoSchool',e.id,on);},'Updated');};
     var ai=$('#aiT');if(ai)ai.onclick=function(){suggestTasksFor(e.id,ai);};
@@ -1407,43 +1446,54 @@ function renderEventForms(eventId){
   var canView=S.meta.canManageEpics||S.me.role==='teacher'||S.me.role==='co_teacher';
   if(!canView){host.innerHTML='';return;}
   var canManage=S.meta.canManageEpics;
-  host.innerHTML='<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Registration forms</h3>'+(canManage?'<button class="sm" id="newForm">＋ Create form</button>':'')+'</div><div id="evFormsBody"><div class="small muted">Loading…</div></div></div>';
-  var nf=$('#newForm');if(nf)nf.onclick=function(){createFormPrompt(eventId);};
+  host.innerHTML='<div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Forms</h3>'+(canManage?'<div class="flex"><button class="sm" id="newRegForm">＋ Registration</button><button class="sm" id="newFbForm">＋ Feedback</button></div>':'')+'</div><div id="evFormsBody"><div class="small muted">Loading…</div></div></div>';
+  var nr=$('#newRegForm');if(nr)nr.onclick=function(){createFormPrompt(eventId,'registration');};
+  var nfb=$('#newFbForm');if(nfb)nfb.onclick=function(){createFormPrompt(eventId,'feedback');};
   api('getEventForms',eventId).then(function(list){paintForms(eventId,list,canManage);}).catch(function(e){var b=$('#evFormsBody');if(b)b.innerHTML='<div class="small muted">'+esc((e&&e.message)||'Could not load')+'</div>';});
 }
 function paintForms(eventId,list,canManage){
   var b=$('#evFormsBody');if(!b)return;
-  if(!list.length){b.innerHTML='<div class="empty">No forms yet.'+(canManage?' Create a registration form — it makes a Google Form + its own responses sheet in Drive.':'')+'</div>';return;}
-  b.innerHTML=list.map(function(f){return '<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="row"><div><b>'+esc(f.title)+'</b><div class="small">'
-      +'<a data-vresp="'+esc(f.id)+'" style="cursor:pointer">👁 View registrations</a> · '
+  if(!list.length){b.innerHTML='<div class="empty">No forms yet.'+(canManage?' A <b>Registration</b> form is for sign-ups; a <b>Feedback</b> form is for after the event. Each makes a Google Form + its own responses sheet, saved in this event\'s Drive folder.':'')+'</div>';return;}
+  var reg=list.filter(function(f){return String(f.kind||'registration')!=='feedback';});
+  var fb=list.filter(function(f){return String(f.kind||'registration')==='feedback';});
+  b.innerHTML=formGroup('Registration',reg,'registration',canManage)+formGroup('Feedback',fb,'feedback',canManage);
+  Array.prototype.forEach.call(b.querySelectorAll('[data-cpf]'),function(a){a.onclick=function(){copyText(a.getAttribute('data-cpf'));toast('Form link copied');};});
+  Array.prototype.forEach.call(b.querySelectorAll('[data-vresp]'),function(a){a.onclick=function(){toggleResponses(a.getAttribute('data-vresp'),a);};});
+  if(canManage)Array.prototype.forEach.call(b.querySelectorAll('[data-delform]'),function(a){a.onclick=function(){confirmDo('Delete this form and its responses? This cannot be undone.',function(){return api('deleteEventForm',a.getAttribute('data-delform'));},'Deleted',function(){renderEventForms(eventId);});};});
+}
+function formGroup(label,list,kind,canManage){
+  if(!list.length)return '';
+  var vlabel=kind==='feedback'?'👁 View responses':'👁 View registrations';
+  return '<div style="margin-bottom:6px"><div class="small muted" style="margin:6px 0 2px;font-weight:600">'+esc(label)+'</div>'+list.map(function(f){
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--line)"><div class="row"><div><b>'+esc(f.title)+'</b><div class="small">'
+      +'<a data-vresp="'+esc(f.id)+'" data-vlabel="'+esc(vlabel)+'" style="cursor:pointer">'+vlabel+'</a> · '
       +'<a href="'+esc(f.published_url)+'" target="_blank">Open form</a> · '
       +'<a href="'+esc(f.edit_url)+'" target="_blank">Edit questions</a> · '
       +'<a href="'+esc(f.sheet_url)+'" target="_blank">Sheet</a>'
       +(f.published_url?' · <a data-cpf="'+esc(f.published_url)+'" style="cursor:pointer">Copy link</a>':'')
       +'</div></div>'+(canManage?'<a data-delform="'+esc(f.id)+'" style="color:var(--bad);cursor:pointer" class="small nowrap">Delete</a>':'')+'</div>'
-      +'<div id="resp-'+esc(f.id)+'"></div></div>';}).join('');
-  Array.prototype.forEach.call(b.querySelectorAll('[data-cpf]'),function(a){a.onclick=function(){copyText(a.getAttribute('data-cpf'));toast('Form link copied');};});
-  Array.prototype.forEach.call(b.querySelectorAll('[data-vresp]'),function(a){a.onclick=function(){toggleResponses(a.getAttribute('data-vresp'),a);};});
-  if(canManage)Array.prototype.forEach.call(b.querySelectorAll('[data-delform]'),function(a){a.onclick=function(){confirmDo('Delete this form and its responses? This cannot be undone.',function(){return api('deleteEventForm',a.getAttribute('data-delform'));},'Deleted',function(){renderEventForms(eventId);});};});
+      +'<div id="resp-'+esc(f.id)+'"></div></div>';
+  }).join('')+'</div>';
 }
 function toggleResponses(formId,link){
   var host=$('#resp-'+formId);if(!host)return;
-  if(host.getAttribute('data-open')==='1'){host.innerHTML='';host.removeAttribute('data-open');link.textContent='👁 View registrations';return;}
-  host.setAttribute('data-open','1');link.textContent='Hide registrations';host.innerHTML='<div class="small muted" style="padding:6px 0">Loading…</div>';
+  if(host.getAttribute('data-open')==='1'){host.innerHTML='';host.removeAttribute('data-open');link.textContent=link.getAttribute('data-vlabel')||'👁 View';return;}
+  host.setAttribute('data-open','1');link.textContent='Hide';host.innerHTML='<div class="small muted" style="padding:6px 0">Loading…</div>';
   api('getFormResponses',formId).then(function(d){host.innerHTML=responsesTable(d);}).catch(function(e){host.innerHTML='<div class="small muted">'+esc((e&&e.message)||'Could not load')+'</div>';});
 }
 function responsesTable(d){
-  if(!d||!d.count)return '<div class="empty" style="margin:6px 0">No registrations yet.</div>';
+  if(!d||!d.count)return '<div class="empty" style="margin:6px 0">No responses yet.</div>';
   var hd=d.headers||[],rows=d.rows||[];
-  return '<div class="small muted" style="margin:8px 0 4px"><b>'+d.count+'</b> registration'+(d.count===1?'':'s')+'</div>'
+  return '<div class="small muted" style="margin:8px 0 4px"><b>'+d.count+'</b> response'+(d.count===1?'':'s')+'</div>'
     +'<div style="overflow-x:auto;max-height:340px;overflow-y:auto"><table style="font-size:13px"><thead><tr>'+hd.map(function(h){return '<th style="white-space:nowrap">'+esc(h)+'</th>';}).join('')+'</tr></thead><tbody>'
     +rows.map(function(r){return '<tr>'+r.map(function(c){return '<td>'+esc(c)+'</td>';}).join('')+'</tr>';}).join('')
     +'</tbody></table></div>';
 }
-function createFormPrompt(eventId){
-  modal('Create registration form',[{name:'title',label:'Form title',hint:'blank = "Registration — <event name>"',value:''}],function(out){
+function createFormPrompt(eventId,kind){
+  kind=kind||'registration';var isFb=kind==='feedback';
+  modal(isFb?'Create feedback form':'Create registration form',[{name:'title',label:'Form title',hint:isFb?'blank = "Feedback — <event name>"':'blank = "Registration — <event name>"',value:''}],function(out){
     toast('Creating form…');
-    return api('createEventForm',eventId,out.title).then(function(){toast('Form created');renderEventForms(eventId);});
+    return api(isFb?'createEventFeedbackForm':'createEventForm',eventId,out.title).then(function(){toast('Form created');renderEventForms(eventId);});
   });
 }
 function renderEventMedia(eventId){
@@ -1579,6 +1629,7 @@ function openEpicForm(e){
     {name:'name',label:'Event name',value:e.name,required:true},
     {name:'program',label:'Program',type:'select',options:S.meta.programs,value:e.program},
     {name:'event_date',label:'Event date',type:'date',value:e.event_date},
+    {name:'month',label:'Or just a month',type:'month',hint:'no exact date yet — pins it to that month in the Calendar',value:e.month},
     {name:'no_school',label:'No regular Sunday school this day',type:'checkbox',hint:'e.g. church event / holiday Sunday',value:e.no_school==='yes'},
     {name:'status',label:'Status',type:'select',options:S.meta.epicStatus,value:e.status},
     {name:'notes',label:'Notes',type:'textarea',value:e.notes},
