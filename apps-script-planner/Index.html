@@ -1042,9 +1042,8 @@ function renderEpics(){
     +'<input id="evSearch" placeholder="🔎 Search all events…" value="'+esc(EVENT_SEARCH)+'" style="max-width:220px">'
     +'<select id="ayPick" style="width:auto">'+ayList.map(function(y){return '<option value="'+y+'"'+(y===CALYEAR?' selected':'')+'>'+ayLabel(y)+'</option>';}).join('')+'</select>'
     +'<label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showArch" style="width:auto"'+(SHOW_ARCHIVED?' checked':'')+'> show archived</label>'
-    +(lead?'<button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button><button class="primary" id="newEpic">+ New event</button>':'')
+    +(lead?'<button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button>':'')
     +'</div></div><div id="progBody"></div>';
-  if(lead)$('#newEpic').onclick=function(){openEpicForm();};
   if(lead){var pb=$('#ptoBtn');if(pb)pb.onclick=openTimeOff;}
   if(lead)$('#tidyE').onclick=function(){confirmDo('Archive every event marked complete?',function(){return api('tidyCompleted');},'Tidied');};
   var sa=$('#showArch');if(sa)sa.onchange=function(){SHOW_ARCHIVED=this.checked;renderEpics();};
