@@ -1656,9 +1656,7 @@ function openTaskForm(epicId,t){
     if(String(e.archived||'').trim()!=='')return false;
     if(String(e.id)===String(epicId))return true;           // always keep the task's own event
     if(eventComplete(e))return false;                        // hide completed events
-    var m=String(e.event_date||'').match(/^(\d{4})/);
-    if(m&&+m[1]<2026)return false;                           // hide pre-2026 dated events (undated buckets stay)
-    return true;
+    return !e.event_date||ayOf(e.event_date)===curAcademicYear(); // only this academic year (Jul–Jun); undated buckets stay
   }).sort(function(a,b){return (a.event_date||'0').localeCompare(b.event_date||'0');});
   function evLabel(e){return e.name+(e.event_date?' ('+e.event_date+')':'');}
   var evNames=evList.map(evLabel),evByLabel={};evList.forEach(function(e){evByLabel[evLabel(e)]=e.id;});
