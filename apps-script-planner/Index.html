@@ -437,8 +437,20 @@ function renderOffertoryTable(d){
     table='<table><thead>'+head+'</thead><tbody>'+body+foot+'</tbody></table>';
   }else{table='<div class="empty">No offertory recorded for '+esc(d.year)+' yet. Enter it per class on the This Sunday page.</div>';}
   var b=$('#offBody');
-  b.innerHTML='<div class="flex" style="margin-bottom:16px"><label style="margin:0">Financial year (Jan–Dec)</label> '+yearSel+'</div>'+kpis+table;
+  var can=S.meta.canManageBudget;
+  b.innerHTML='<div class="row" style="margin-bottom:16px"><div class="flex"><label style="margin:0">Financial year (Jan–Dec)</label> '+yearSel+'</div>'+(can?'<button class="primary" id="newOff">+ Add offertory</button>':'')+'</div>'+kpis+table;
   var ys=$('#offYear');if(ys)ys.onchange=function(){OFY=this.value;renderOffertoryInto($('#finBody'));};
+  var nb=$('#newOff');if(nb)nb.onclick=function(){openOffertoryForm(classes);};
+}
+function openOffertoryForm(classes){
+  var d=new Date();d.setDate(d.getDate()-d.getDay()); // most recent Sunday (today if Sunday)
+  var sun=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+  modal('Add offertory',[{name:'date',label:'Sunday',type:'date',value:sun,required:true}]
+    .concat(classes.map(function(c,i){return {name:'c'+i,label:c+' ($)',type:'number',hint:'blank = no change'};})),
+    function(out){
+      var amts={};classes.forEach(function(c,i){amts[c]=out['c'+i];});
+      return api('saveOffertory',out.date,amts).then(function(r){OFY=r.year;toast('Saved');renderOffertoryInto($('#finBody'));});
+    });
 }
 
 /* ------------ weekly class ops (This Sunday) ------------ */

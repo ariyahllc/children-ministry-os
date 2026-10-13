@@ -1624,6 +1624,28 @@ function getOffertory(token, year) {
   return { classes: CLASSES, years: years, year: sel, rows: rows, classTotals: classTotals, grandTotal: grand };
 }
 
+// Record offertory for one Sunday from Finances: amounts = {class: $}. Blank
+// classes are left unchanged; only the offertory field of the weekly row is touched.
+function saveOffertory(token, date, amounts) {
+  var me = requireMember_(token);
+  if (LEADERS.indexOf(me.role) < 0 && me.role !== 'treasurer') throw new Error('NOT_ALLOWED');
+  date = fmtDate_(date);
+  if (!date) throw new Error('Pick a date');
+  var weekly = readTable_(TABS.WEEKLY), n = 0;
+  CLASSES.forEach(function (c) {
+    var v = (amounts || {})[c];
+    if (v === '' || v == null) return;
+    var amt = Number(v);
+    if (isNaN(amt) || amt < 0) throw new Error('Invalid amount for ' + c);
+    var ex = weekly.find(function (r) { return fmtDate_(r.date) === date && String(r.class || '').trim().toLowerCase() === c.toLowerCase(); });
+    if (ex) updateRow_(TABS.WEEKLY, ex.id, { offertory: amt });
+    else insert_(TABS.WEEKLY, { id: uuid_(), date: date, class: c, offertory: amt });
+    n++;
+  });
+  if (!n) throw new Error('Enter at least one amount');
+  return { ok: true, year: date.slice(0, 4) };
+}
+
 /* ---------------------------------------------- semester assignments (roster) */
 // The assigned teacher/co-teacher team for a class this semester.
 function teamForClass_(cls) {
