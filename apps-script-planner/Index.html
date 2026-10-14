@@ -117,12 +117,6 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden}
   .seg button{border:none;border-radius:0;background:var(--card);color:var(--muted);padding:6px 13px;font-size:13px}
   .seg button.on{background:var(--chip);color:var(--chip-ink);font-weight:600}
-  .prog{border-bottom:1px solid var(--line)}
-  .prog>summary{cursor:pointer;font-family:'Fraunces',Georgia,serif;font-size:17px;font-weight:600;padding:12px 0;list-style:none;display:flex;align-items:center;gap:9px}
-  .prog>summary::-webkit-details-marker{display:none}
-  .prog>summary:before{content:'▸';color:var(--muted);transition:transform .15s;font-size:13px}
-  .prog[open]>summary:before{transform:rotate(90deg)}
-  .prog[open]>summary{margin-bottom:4px}
   /* Ask Dorothy */
   #doro{position:fixed;right:20px;bottom:20px;z-index:50}
   .doro-btn{background:var(--pri);color:var(--pri-ink);border:none;border-radius:22px;padding:11px 18px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.22)}
@@ -181,6 +175,22 @@
   .toast{animation:fadeIn .18s ease-out}
   button:active{transform:scale(.97)}
   .sidebar button,.bottomnav button{transition:background .15s,color .15s}
+  .tl-month{font-family:'Fraunces',serif;font-size:17px;font-weight:600;margin:20px 0 8px;scroll-margin-top:12px}
+  .tl-group{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .tl-row{display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid var(--line);cursor:pointer;transition:background .12s}
+  .tl-row:first-child{border-top:none}
+  .tl-row:hover{background:var(--hover)}
+  .tl-row.past{opacity:.55}
+  .tl-date{width:42px;flex:0 0 42px;text-align:center;line-height:1.15}
+  .tl-date b{display:block;font-family:'Fraunces',serif;font-size:21px;color:var(--pri)}
+  .tl-date span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .tl-main{flex:1;min-width:0}
+  .tl-name{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .ev-prog{display:flex;align-items:center;gap:8px;width:150px;flex:0 0 150px}
+  .ev-prog .bar{flex:1;margin:0}
+  .tl-month.sub{font-size:14px;color:var(--muted);margin-top:14px}
+  .tl-badge{width:92px;flex:0 0 92px;text-align:right}
+  @media(max-width:700px){.tl-row{flex-wrap:wrap;gap:6px 12px}.tl-main{flex-basis:calc(100% - 60px)}.ev-prog{margin-left:54px;flex:1 1 auto;width:auto}.tl-badge{width:auto;flex:0 0 auto}}
   ::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
   @media(prefers-reduced-motion:reduce){*,::view-transition-group(*){animation:none!important;transition:none!important}}
 </style>
@@ -822,7 +832,7 @@ function leaderDash(){
    +kpi(activeEventsCurAy().length,'Events '+ayLabel(curAcademicYear()))+kpi(S.tasks.length,'Tasks')
    +kpi(overdue.length,'Overdue',overdue.length?'var(--bad)':'')+kpi(unassigned.length,'Unassigned',unassigned.length?'var(--warn)':'')
    +'</div>'
-   +'<h3>Events</h3><div class="grid cards" id="epicCards"></div>'
+   +'<h3>Events</h3><div id="epicCards"></div>'
    +sectionTasks('Overdue',overdue)
    +sectionTasks('Unassigned',unassigned);
   $('#newEpic').onclick=function(){openEpicForm();};
@@ -1019,8 +1029,8 @@ function openExpenseForm(b){
 }
 function boardDash(){
   var v=$('#view');
-  v.innerHTML='<div class="row"><h2>Overview</h2></div><div class="grid cards" id="epicCards"></div>';
-  renderEpicCards($('#epicCards'),true);
+  v.innerHTML='<div class="row"><h2>Overview</h2></div><div id="epicCards"></div>';
+  renderEpicCards($('#epicCards'));
 }
 function kpi(val,label,color){return '<div class="kpi"><b style="color:'+(color||'inherit')+'">'+val+'</b><span class="muted small">'+label+'</span></div>';}
 function sectionTasks(title,list){
@@ -1032,43 +1042,19 @@ function sectionTasks(title,list){
 function activeEvents(){return S.epics.filter(function(e){return String(e.archived||'').trim()==='';});}
 function curAcademicYear(){var d=new Date();return d.getMonth()>=6?d.getFullYear():d.getFullYear()-1;}
 function activeEventsCurAy(){var ay=curAcademicYear();return activeEvents().filter(function(e){return !e.event_date||ayOf(e.event_date)===ay;});}
-function eventCard(e){
-  var p=epicProgress(e.id);var cd=countdown(e.event_date);
-  var arch=String(e.archived||'').trim()!=='';var done=eventComplete(e);
-  var badge=arch?'archived':(done?'✓ Complete':cd.txt);var bcls=arch?'':(done?'cd-done':cd.cls);
-  return '<div class="card click" data-e="'+esc(e.id)+'"'+(arch?' style="opacity:.55"':'')+'>'
-    +'<div class="flex" style="justify-content:space-between"><span class="chip">'+esc(e.program||'—')+'</span><span class="small '+bcls+'">'+badge+'</span></div>'
-    +'<h3 style="margin:8px 0 4px">'+esc(e.name)+formBadge(e.id)+'</h3>'
-    +'<div class="small muted">'+esc(e.event_date||(e.month?('📌 '+e.month):'no date'))+' · '+esc(e.status||'')+'</div>'
-    +'<div class="bar" style="margin-top:10px"><i style="width:'+p.pct+'%"></i></div>'
-    +'<div class="small muted" style="margin-top:4px">'+p.done+'/'+p.total+' tasks done</div>'
-    +'</div>';
-}
 function formBadge(id){var r=(S.formCounts||{})[id]||0,f=(S.feedbackFormCounts||{})[id]||0,out='';
   if(r)out+=' <span class="chip" style="background:#e7eef7;color:#1b6cb0" title="'+r+' registration form'+(r===1?'':'s')+'">📋 '+r+'</span>';
   if(f)out+=' <span class="chip" style="background:#eaf7ee;color:#1b7a3d" title="'+f+' feedback form'+(f===1?'':'s')+'">💬 '+f+'</span>';
   return out;}
-function renderEpicCards(container,readonly){
-  var list=activeEventsCurAy();
-  if(!list.length){container.className='';container.innerHTML='<div class="empty">No events yet.</div>';return;}
-  container.className='';
-  function pad(n){return (n<10?'0':'')+n;}
-  var d=new Date();var today=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
-  var MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
-  function ym(s){var m=String(s).match(/^(\d{4})-(\d{2})/);return m?m[1]+'-'+m[2]:'';}
-  function ymLabel(k){var p=k.split('-');return MON[(+p[1])-1]+' '+p[0];}
+function renderEpicCards(container){
+  var list=activeEventsCurAy(),t=today();
+  if(!list.length){container.innerHTML='<div class="empty">No events yet.</div>';return;}
   var dated=list.filter(function(e){return e.event_date;});
-  var undated=list.filter(function(e){return !e.event_date;});
-  var up=dated.filter(function(e){return e.event_date>=today;}).sort(function(a,b){return a.event_date.localeCompare(b.event_date);});
-  var past=dated.filter(function(e){return e.event_date<today;}).sort(function(a,b){return b.event_date.localeCompare(a.event_date);});
-  function grp(evs){var g={},order=[];evs.forEach(function(e){var k=ym(e.event_date);if(!g[k]){g[k]=[];order.push(k);}g[k].push(e);});return {g:g,order:order};}
-  var html='',U=grp(up);
-  U.order.forEach(function(k){html+='<h3 style="margin:16px 0 10px">'+esc(ymLabel(k))+'</h3><div class="grid cards">'+U.g[k].map(eventCard).join('')+'</div>';});
-  if(undated.length)html+='<h3 style="margin:18px 0 10px">No date yet</h3><div class="grid cards">'+undated.map(eventCard).join('')+'</div>';
-  if(past.length){html+='<h3 style="margin:22px 0 10px;color:var(--muted)">Earlier</h3>';var P=grp(past);
-    P.order.forEach(function(k){html+='<div class="small muted" style="margin:12px 0 6px">'+esc(ymLabel(k))+'</div><div class="grid cards" style="opacity:.65">'+P.g[k].map(eventCard).join('')+'</div>';});}
-  container.innerHTML=html;
-  Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+  var up=dated.filter(function(e){return parseD(e.event_date)>=t;}).sort(byDate);
+  var past=dated.filter(function(e){return parseD(e.event_date)<t;}).sort(function(a,b){return byDate(b,a);});
+  container.innerHTML=tlSections(up)+tlSections(list.filter(function(e){return !e.event_date;}))
+    +(past.length?'<h3 style="margin:26px 0 0;color:var(--muted)">Earlier</h3>'+tlSections(past,'sub'):'');
+  bindEvRows(container);
 }
 var SHOW_ARCHIVED=false;
 var CALYEAR=null;
@@ -1099,7 +1085,7 @@ function renderEpics(){
   Array.prototype.forEach.call(v.querySelectorAll('.seg button'),function(b){b.onclick=function(){CALMODE=b.getAttribute('data-cm');renderEpics();};});
   var es=$('#evSearch');if(es)es.oninput=function(){EVENT_SEARCH=this.value;if(EVENT_SEARCH.trim())renderEventSearch($('#progBody'));else renderEpics();};
   if(EVENT_SEARCH.trim()){renderEventSearch($('#progBody'));return;}
-  if(CALMODE==='events'){renderEventsByProgram($('#progBody'));return;}
+  if(CALMODE==='events'){renderEventsTimeline($('#progBody'));return;}
   // A late-arriving birthday fetch must not repaint the calendar if the user has since
   // switched to Events (or left the view entirely) — guard on current mode + panel.
   function paintCal(){var pb=$('#progBody');if(pb&&CALMODE==='calendar'&&!EPIC)renderEventsByDate(pb);}
@@ -1116,8 +1102,8 @@ function renderEventSearch(container){
     return [e.name,e.program,e.notes,e.status,e.event_date,e.month].join(' ').toLowerCase().indexOf(q)>=0;
   }).sort(function(a,b){return String(b.event_date||b.month||'').localeCompare(String(a.event_date||a.month||''));});
   if(!list.length){container.innerHTML='<div class="empty">No events match "'+esc(EVENT_SEARCH)+'".</div>';return;}
-  container.innerHTML='<div class="small muted" style="margin:4px 0 10px">'+list.length+' match'+(list.length===1?'':'es')+' — includes completed &amp; archived</div><div class="grid cards">'+list.map(eventCard).join('')+'</div>';
-  Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
+  container.innerHTML='<div class="small muted" style="margin:4px 0 10px">'+list.length+' match'+(list.length===1?'':'es')+' — includes completed &amp; archived</div>'+tlSections(list);
+  bindEvRows(container);
 }
 function renderEventsByDate(container){
   function pad(n){return (n<10?'0':'')+n;}
@@ -1260,24 +1246,46 @@ function openSuggestModal(epicId,tasks){
     reloadAfter(api('addSuggestedTasks',epicId,picked),'Added '+picked.length+' task'+(picked.length>1?'s':'')).then(function(){bd.remove();}).catch(function(e){b.disabled=false;b.textContent='Add selected';apiErr(e);});
   };
 }
-function renderEventsByProgram(container){
-  var progs=S.meta.programs||[];var byProg={};progs.forEach(function(p){byProg[p]=[];});var other=[];
-  S.epics.forEach(function(e){
-    if(!SHOW_ARCHIVED&&String(e.archived||'').trim()!=='')return;
-    if(e.event_date){var a=ayOf(e.event_date);if(a!==CALYEAR)return;} // dated events: only the selected year (undated buckets always show)
-    var pr=String(e.program||'').trim();
-    if(byProg[pr])byProg[pr].push(e);else other.push(e);
+/* Events timeline: events grouped under month headings, one row each (date, name, task progress, countdown).
+   Used by the Events tab, the dashboards and event search. */
+var MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'],WDAYS=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function eventsInYear(){
+  return S.epics.filter(function(e){
+    if(!SHOW_ARCHIVED&&String(e.archived||'').trim()!=='')return false;
+    return !e.event_date||ayOf(e.event_date)===CALYEAR; // undated buckets always show
   });
-  var html='';
-  progs.forEach(function(p){html+=programSection(p,byProg[p]);});
-  if(other.length)html+=programSection('Not assigned to a program',other);
-  container.innerHTML=html||'<div class="empty">No events yet.</div>';
-  Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
 }
-function programSection(name,list){
-  if(!list.length)return '';
-  var cards=list.slice().sort(function(a,b){return (a.event_date||'').localeCompare(b.event_date||'');}).map(eventCard).join('');
-  return '<details class="prog" open><summary>'+esc(name)+' <span class="muted small" style="font-weight:400">('+list.length+')</span></summary><div class="grid cards" style="margin:6px 0 14px">'+cards+'</div></details>';
+function evBadge(e){
+  if(String(e.archived||'').trim()!=='')return '<span class="small muted">archived</span>';
+  if(eventComplete(e))return '<span class="small cd-done">✓ Complete</span>';
+  var cd=countdown(e.event_date);return e.event_date?'<span class="small '+cd.cls+'">'+cd.txt+'</span>':'';
+}
+function evProg(e){var p=epicProgress(e.id);return '<div class="ev-prog"><div class="bar"><i style="width:'+p.pct+'%"></i></div><span class="small muted">'+p.done+'/'+p.total+'</span></div>';}
+function tlRow(e){
+  var d=parseD(e.event_date),past=d&&d<today(),arch=String(e.archived||'').trim()!=='';
+  var date=d?'<div class="tl-date"><b>'+d.getDate()+'</b><span>'+WDAYS[d.getDay()]+'</span></div>':'<div class="tl-date"><span>—</span></div>';
+  return '<div class="tl-row'+(past||arch?' past':'')+'" data-e="'+esc(e.id)+'">'+date
+    +'<div class="tl-main"><div class="tl-name">'+esc(e.name)+formBadge(e.id)+'</div><div class="small muted">'+esc(e.program||'')+'</div></div>'
+    +evProg(e)+'<div class="tl-badge">'+evBadge(e)+'</div></div>';
+}
+function monthOf(e){var d=parseD(e.event_date);return d?MONTHS[d.getMonth()]+' '+d.getFullYear():'No date yet';}
+// Events already in display order -> month sections (consecutive events with the same month share one).
+function tlSections(evs,cls){
+  var html='',cur=null;
+  evs.forEach(function(e){var m=monthOf(e);if(m!==cur){html+=(cur!==null?'</div>':'')+'<div class="tl-month'+(cls?' '+cls:'')+'">'+esc(m)+'</div><div class="tl-group">';cur=m;}html+=tlRow(e);});
+  return cur!==null?html+'</div>':'';
+}
+function bindEvRows(container){Array.prototype.forEach.call(container.querySelectorAll('[data-e]'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});}
+function byDate(a,b){return String(a.event_date||'').localeCompare(String(b.event_date||''));}
+function renderEventsTimeline(container){
+  var list=eventsInYear();
+  var html=tlSections(list.filter(function(e){return e.event_date;}).sort(byDate))+tlSections(list.filter(function(e){return !e.event_date;}));
+  container.innerHTML=html||'<div class="empty">No events yet.</div>';
+  bindEvRows(container);
+  // Bring the current month into view so upcoming events are on screen first.
+  var t=today(),m=MONTHS[t.getMonth()]+' '+t.getFullYear();
+  var hd=[].filter.call(container.querySelectorAll('.tl-month'),function(x){return x.textContent===m;})[0];
+  if(hd&&hd.previousElementSibling)setTimeout(function(){hd.scrollIntoView({block:'start',behavior:'smooth'});},250);
 }
 
 /* ------------ epic detail ------------ */
