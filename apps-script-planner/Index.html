@@ -170,6 +170,19 @@
   .chip{box-shadow:inset 0 0 0 1px rgba(0,0,0,.03)}
   .modal{box-shadow:0 30px 70px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.4)}
   @media(max-width:900px){ #doro{bottom:76px;right:14px} }
+  /* motion: content, modals, menus and toasts ease in instead of popping */
+  @keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes popIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .wrap{animation:viewIn .22s ease-out}
+  .backdrop{animation:fadeIn .16s ease-out}
+  .modal{animation:popIn .2s cubic-bezier(.2,.8,.3,1)}
+  .menu{animation:popIn .14s ease-out}
+  .toast{animation:fadeIn .18s ease-out}
+  button:active{transform:scale(.97)}
+  .sidebar button,.bottomnav button{transition:background .15s,color .15s}
+  ::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
+  @media(prefers-reduced-motion:reduce){*,::view-transition-group(*){animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
@@ -303,8 +316,19 @@ function openMoreMenu(btn){
   m.innerHTML=items.map(function(it){return '<div class="menu-item" data-v="'+it.key+'"><span>'+it.icon+'</span> '+esc(it.label)+navBadge(it.badge)+'</div>';}).join('');
   document.body.appendChild(m);
   var r=btn.getBoundingClientRect();m.style.bottom=(window.innerHeight-r.top+6)+'px';m.style.right='10px';
-  Array.prototype.forEach.call(m.querySelectorAll('[data-v]'),function(el){el.onclick=function(){VIEW=el.getAttribute('data-v');EPIC=null;m.remove();render();};});
+  Array.prototype.forEach.call(m.querySelectorAll('[data-v]'),function(el){el.onclick=function(){m.remove();go(el.getAttribute('data-v'));};});
   setTimeout(function(){document.addEventListener('click',function h(e){var mm=document.getElementById('moreMenu');if(mm&&!mm.contains(e.target)&&e.target.id!=='moreTab'){mm.remove();document.removeEventListener('click',h);}});},0);
+}
+// Nav click: swap only the content area (top bar + sidebar stay put), cross-faded
+// with the View Transitions API where supported, else the CSS fade-in on #view.
+function go(view){
+  VIEW=view;EPIC=null;
+  var more=navItems().slice(4).some(function(x){return x.key===VIEW;});
+  Array.prototype.forEach.call(document.querySelectorAll('.sidebar [data-v],.bottomnav [data-v]'),function(b){b.classList.toggle('active',b.getAttribute('data-v')===VIEW);});
+  var mt=$('#moreTab');if(mt)mt.classList.toggle('active',more);
+  window.scrollTo(0,0);
+  if(document.startViewTransition){document.startViewTransition(renderView);return;}
+  var v=$('#view');v.style.animation='none';void v.offsetWidth;v.style.animation='';renderView();
 }
 function render(){
   var me=S.me;
@@ -326,7 +350,7 @@ function render(){
   var th=$('#theme'); if(th)th.onclick=toggleTheme;
   var gn=$('#globalNew'); if(gn)gn.onclick=function(e){e.stopPropagation();openNewMenu(gn);};
   var mt=$('#moreTab'); if(mt)mt.onclick=function(e){e.stopPropagation();openMoreMenu(mt);};
-  Array.prototype.forEach.call(document.querySelectorAll('[data-v]'),function(b){b.onclick=function(){VIEW=b.getAttribute('data-v');EPIC=null;render();};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-v]'),function(b){b.onclick=function(){go(b.getAttribute('data-v'));};});
   renderView();
   mountDorothy();
 }
