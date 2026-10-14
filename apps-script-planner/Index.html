@@ -60,7 +60,17 @@
     .tabbadge{position:absolute;top:-5px;left:11px;min-width:15px;height:15px;line-height:15px;padding:0 3px;font-size:9px;font-weight:700;border-radius:999px;background:var(--pri);color:var(--pri-ink)}
     #doro{bottom:74px;right:14px}
     .doro-panel{bottom:118px}
+    /* phones: a wide table must scroll inside itself, never widen the page (that zooms
+       the whole layout out and pushes the bottom bar and Sign out off-screen) */
+    .wrap table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .topbar{padding:10px 14px;gap:8px}
+    .topbar button{white-space:nowrap;margin:0!important}
+    .brand{font-size:17px;white-space:nowrap;gap:8px}
+    .brand .dot{width:28px;height:28px}
+    .me{display:none}
+    .wrap h2{font-size:24px}
   }
+  body{overflow-x:clip}
   .row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
   h2{font-family:'Fraunces',Georgia,serif;font-size:26px;margin:0;letter-spacing:-.01em;font-weight:600}
   h3{font-family:'Fraunces',Georgia,serif;font-size:17px;margin:0 0 8px;font-weight:600}
@@ -193,6 +203,25 @@
   @media(max-width:700px){.tl-row{flex-wrap:wrap;gap:6px 12px}.tl-main{flex-basis:calc(100% - 60px)}.ev-prog{margin-left:54px;flex:1 1 auto;width:auto}.tl-badge{width:auto;flex:0 0 auto}}
   ::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
   @media(prefers-reduced-motion:reduce){*,::view-transition-group(*){animation:none!important;transition:none!important}}
+  @media(max-width:900px){ /* phone spacing; after the base rules so it wins */
+    .qtiles{grid-template-columns:repeat(auto-fit,minmax(96px,1fr))!important;gap:8px!important;margin:4px 0 12px!important}
+    .qtiles .card{padding:10px 6px!important;font-size:13px}
+    .kpis{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .kpi{padding:10px 8px}
+    .kpi b{font-size:20px}
+    .kpi span{font-size:11px;line-height:1.2;display:block}
+    .wrap th,.wrap td{white-space:nowrap}
+    .wrap td:first-child{white-space:normal;min-width:170px}
+    /* task tables: each task becomes a stacked row (title on top, details wrap below) */
+    .wrap table.ttable{display:block;overflow:visible}
+    .ttable thead{display:none}
+    .ttable tbody{display:block}
+    .ttable tr{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:12px 14px;border-top:1px solid var(--line)}
+    .ttable tr:first-child{border-top:none}
+    .ttable td{display:block;padding:0;border:0;white-space:normal!important;min-width:0!important;font-size:13px}
+    .ttable td:first-child{flex-basis:100%;font-size:14px;font-weight:600}
+    .ttable td select{width:auto;padding:4px 8px}
+  }
 </style>
 </head>
 <body>
@@ -819,7 +848,7 @@ function quickTiles(){
   if(S.meta.canViewChildren)t.push(['weekly','This Sunday']);
   t.push(['mytasks',(S.me.role==='admin'||S.me.role==='co_leader'?'Tasks':'My tasks')]);
   t.push(['epics','Events']);
-  return '<div class="grid cards" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:6px 0 18px">'+t.map(function(x){return '<div class="card click" data-jump="'+x[0]+'" style="text-align:center;font-weight:600;padding:18px"><div style="color:var(--pri);margin-bottom:6px">'+NAV_ICON[x[0]]+'</div>'+esc(x[1])+(x[0]==='mytasks'?navBadge(openTaskCount()):'')+'</div>';}).join('')+'</div>';
+  return '<div class="grid cards qtiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:6px 0 18px">'+t.map(function(x){return '<div class="card click" data-jump="'+x[0]+'" style="text-align:center;font-weight:600;padding:18px"><div style="color:var(--pri);margin-bottom:6px">'+NAV_ICON[x[0]]+'</div>'+esc(x[1])+(x[0]==='mytasks'?navBadge(openTaskCount()):'')+'</div>';}).join('')+'</div>';
 }
 function bindJumps(){Array.prototype.forEach.call(document.querySelectorAll('[data-jump]'),function(c){c.onclick=function(){VIEW=c.getAttribute('data-jump');EPIC=null;render();};});}
 function leaderDash(){
@@ -1343,7 +1372,7 @@ function sortTasks(ts){
 }
 function sortTh(key,label){var on=TASKSORT.key===key;return '<th class="sortth" data-sort="'+key+'" style="cursor:pointer;user-select:none" title="Sort by '+label+'">'+label+(on?(TASKSORT.dir>0?' ▲':' ▼'):'')+'</th>';}
 function taskTable(ts,lead){
-  return '<table><thead><tr>'+sortTh('title','Task')+sortTh('owner','Owner')+sortTh('due','Due')+'<th>When</th>'+sortTh('priority','Priority')+sortTh('status','Status')+'<th></th></tr></thead><tbody>'
+  return '<table class="ttable"><thead><tr>'+sortTh('title','Task')+sortTh('owner','Owner')+sortTh('due','Due')+'<th>When</th>'+sortTh('priority','Priority')+sortTh('status','Status')+'<th></th></tr></thead><tbody>'
     +ts.map(function(t){
       var ov=isOverdue(t);var cd=countdown(t.due_date);
       var canDoer=(S.me.role==='teacher'||S.me.role==='co_teacher')&&String(t.owner)===String(S.me.name);
@@ -1358,7 +1387,7 @@ function taskTable(ts,lead){
 }
 function leaderTaskTable(ts){
   ts=sortTasks(ts);
-  return '<table><thead><tr>'+sortTh('title','Task')+sortTh('event','Event')+sortTh('owner','Owner')+sortTh('due','Due')+sortTh('status','Status')+'<th></th></tr></thead><tbody>'
+  return '<table class="ttable"><thead><tr>'+sortTh('title','Task')+sortTh('event','Event')+sortTh('owner','Owner')+sortTh('due','Due')+sortTh('status','Status')+'<th></th></tr></thead><tbody>'
     +ts.map(function(t){var cd=countdown(t.due_date);
       return '<tr><td>'+esc(t.title)+'</td><td class="small muted">'+esc(t.epic_name||'')+'</td><td>'+(t.owner?esc(t.owner):'<span class="muted">unassigned</span>')+'</td>'
         +'<td class="small '+cd.cls+'">'+esc(t.due_date||'—')+' ('+cd.txt+')</td>'
@@ -1368,7 +1397,7 @@ function leaderTaskTable(ts){
     +'</tbody></table>';
 }
 function myTaskTable(ts){
-  return '<table><thead><tr><th>Task</th><th>Event</th><th>Due</th><th>When</th><th>Status</th></tr></thead><tbody>'
+  return '<table class="ttable"><thead><tr><th>Task</th><th>Event</th><th>Due</th><th>When</th><th>Status</th></tr></thead><tbody>'
     +ts.map(function(t){var cd=countdown(t.due_date);return '<tr><td>'+esc(t.title)+'</td><td class="small muted">'+esc(t.epic_name||'')+'</td><td class="small">'+esc(t.due_date||'—')+'</td><td class="small '+cd.cls+'">'+cd.txt+'</td>'
       +'<td><select data-status="'+esc(t.id)+'">'+S.meta.taskStatus.map(function(s){return '<option '+(s===t.status?'selected':'')+'>'+s+'</option>';}).join('')+'</select></td></tr>';}).join('')
     +'</tbody></table>';
