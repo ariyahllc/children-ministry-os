@@ -896,7 +896,7 @@ function renderBudgetInto(container){
   var ys=$('#buYear');if(ys)ys.onchange=function(){BUFY=this.value;renderFinances();};
   if(can){var nb=$('#newBL');if(nb)nb.onclick=function(){openBudgetLineForm(null);};
     Array.prototype.forEach.call(document.querySelectorAll('[data-ble]'),function(a){a.onclick=function(){var l=(S.budgetPlan||[]).filter(function(x){return String(x.id)===a.getAttribute('data-ble');})[0];openBudgetLineForm(l);};});
-    Array.prototype.forEach.call(document.querySelectorAll('[data-bld]'),function(a){a.onclick=function(){var id=a.getAttribute('data-bld');confirmDo('Delete this budget line?',function(){return api('deleteBudgetLine',id);},'Deleted');};});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bld]'),function(a){a.onclick=function(){var id=a.getAttribute('data-bld');confirmDo('Delete this budget line?',function(){return api('deleteBudgetLine',id);},'Deleted',null,function(){removeLocal('budgetPlan',id);});};});
   }
 }
 function openBudgetLineForm(l){
@@ -906,7 +906,7 @@ function openBudgetLineForm(l){
     {name:'category',label:'Category',value:l.category,required:true},
     {name:'amount',label:'Budget amount ($)',type:'number',value:l.amount},
     {name:'notes',label:'Notes',type:'textarea',value:l.notes},
-  ],function(out){return reloadAfter(api('saveBudgetLine',{id:l.id,fy:out.fy,category:out.category,amount:out.amount,notes:out.notes}),'Saved');});
+  ],function(out){var d={id:l.id,fy:out.fy,category:out.category,amount:out.amount,notes:out.notes};return saveOptimistic(api('saveBudgetLine',d),'Saved',function(){upsertLocal('budgetPlan',Object.assign({},d,{amount:Number(d.amount)||0}));});});
 }
 function isReimbursed(b){return /yes|reimbursed/i.test(String(b.reimbursed||''));}
 var EXFY=null;
@@ -1308,9 +1308,9 @@ function renderEpicDetail(){
     $('#editE').onclick=function(){openEpicForm(e);};
     $('#cloneE').onclick=function(){openCloneForm(e);};
     var fl=$('#flyerE');if(fl)fl.onclick=function(){openFlyer(e);};
-    $('#delE').onclick=function(){confirmDo('Delete event "'+e.name+'" and all its tasks?',function(){return api('deleteEpic',e.id);},'Event deleted',function(){EPIC=null;});};
-    $('#archE').onclick=function(){var toArch=!String(e.archived||'').trim();confirmDo((toArch?'Archive':'Unarchive')+' "'+e.name+'"?',function(){return api('setEventArchived',e.id,toArch);},toArch?'Archived':'Unarchived',function(){EPIC=null;});};
-    var de=$('#doneE');if(de)de.onclick=function(){var nd=!eventComplete(e);confirmDo(nd?'Mark "'+e.name+'" complete? It stays on the Events tab (with its tasks, feedback and media) until you archive it.':'Reopen "'+e.name+'"?',function(){return api('setEventComplete',e.id,nd);},nd?'Marked complete':'Reopened');};
+    $('#delE').onclick=function(){confirmDo('Delete event "'+e.name+'" and all its tasks?',function(){return api('deleteEpic',e.id);},'Event deleted',function(){EPIC=null;},function(){removeLocal('epics',e.id);S.tasks=(S.tasks||[]).filter(function(t){return String(t.epic_id)!==String(e.id);});});};
+    $('#archE').onclick=function(){var toArch=!String(e.archived||'').trim();confirmDo((toArch?'Archive':'Unarchive')+' "'+e.name+'"?',function(){return api('setEventArchived',e.id,toArch);},toArch?'Archived':'Unarchived',function(){EPIC=null;},function(){upsertLocal('epics',{id:e.id,archived:toArch?'yes':''});});};
+    var de=$('#doneE');if(de)de.onclick=function(){var nd=!eventComplete(e);confirmDo(nd?'Mark "'+e.name+'" complete? It stays on the Events tab (with its tasks, feedback and media) until you archive it.':'Reopen "'+e.name+'"?',function(){return api('setEventComplete',e.id,nd);},nd?'Marked complete':'Reopened',null,function(){upsertLocal('epics',{id:e.id,status:nd?'Completed':'In Progress'});});};
     $('#newT').onclick=function(){openTaskForm(e.id);};
     var ns=$('#noSch');if(ns)ns.onclick=function(){var on=String(e.status||'').toLowerCase()!=='no school';confirmDo(on?'Mark this Sunday as NO Sunday School?':'Mark class back on for this Sunday?',function(){return api('setSundayNoSchool',e.id,on);},'Updated');};
     var ai=$('#aiT');if(ai)ai.onclick=function(){suggestTasksFor(e.id,ai);};
@@ -1370,7 +1370,7 @@ function bindTaskRows(lead){
   Array.prototype.forEach.call(document.querySelectorAll('[data-status]'),function(sel){sel.onchange=function(){updateStatus(sel.getAttribute('data-status'),sel.value);};});
   if(lead){
     Array.prototype.forEach.call(document.querySelectorAll('[data-edit]'),function(a){a.onclick=function(){var t=S.tasks.filter(function(x){return String(x.id)===a.getAttribute('data-edit');})[0];openTaskForm(t.epic_id,t);};});
-    Array.prototype.forEach.call(document.querySelectorAll('[data-del]'),function(a){a.onclick=function(){var id=a.getAttribute('data-del');confirmDo('Delete this task?',function(){return api('deleteTask',id);},'Task deleted');};});
+    Array.prototype.forEach.call(document.querySelectorAll('[data-del]'),function(a){a.onclick=function(){var id=a.getAttribute('data-del');confirmDo('Delete this task?',function(){return api('deleteTask',id);},'Task deleted',null,function(){removeLocal('tasks',id);});};});
   }
 }
 function bindMyTaskRows(){Array.prototype.forEach.call(document.querySelectorAll('[data-status]'),function(sel){sel.onchange=function(){updateStatus(sel.getAttribute('data-status'),sel.value);};});}
@@ -1423,7 +1423,7 @@ function budgetTable(list){
 }
 function bindBudgetRows(){
   Array.prototype.forEach.call(document.querySelectorAll('[data-be]'),function(a){a.onclick=function(){var b=(S.budget||[]).filter(function(x){return String(x.id)===a.getAttribute('data-be');})[0];openExpenseForm(b);};});
-  Array.prototype.forEach.call(document.querySelectorAll('[data-bd]'),function(a){a.onclick=function(){var id=a.getAttribute('data-bd');confirmDo('Delete this budget line?',function(){return api('deleteBudget',id);},'Deleted');};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bd]'),function(a){a.onclick=function(){var id=a.getAttribute('data-bd');confirmDo('Delete this budget line?',function(){return api('deleteBudget',id);},'Deleted',null,function(){removeLocal('budget',id);});};});
 }
 
 /* ------------ members (admin) ------------ */
@@ -1447,7 +1447,7 @@ function renderMembers(){
   var mf=$('#mFilter');if(mf)mf.onchange=function(){MEMFILTER=this.value;renderMembers();};
   var nm=$('#newM');if(nm)nm.onclick=function(){openMemberForm();};
   Array.prototype.forEach.call(document.querySelectorAll('[data-me]'),function(a){a.onclick=function(){var m=S.members.filter(function(x){return x.email===a.getAttribute('data-me');})[0];openMemberForm(m);};});
-  Array.prototype.forEach.call(document.querySelectorAll('[data-md]'),function(a){a.onclick=function(){var em=a.getAttribute('data-md');confirmDo('Remove '+em+'?',function(){return api('deleteMember',em);},'Removed');};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-md]'),function(a){a.onclick=function(){var em=a.getAttribute('data-md');confirmDo('Remove '+em+'?',function(){return api('deleteMember',em);},'Removed',null,function(){removeLocal('members',em,'email');});};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-cp]'),function(a){a.onclick=function(){copyText(a.getAttribute('data-cp'));};});
   Array.prototype.forEach.call(document.querySelectorAll('[data-rg]'),function(a){a.onclick=function(){var em=a.getAttribute('data-rg');confirmDo('Reset invite link for '+em+'? Their current link stops working.',function(){return api('regenerateInvite',em);},'New link ready');};});
   bindMemSeg_(v);
@@ -1640,7 +1640,7 @@ function renderFeedbackSection(e,lead){
 function bindFeedback(e,lead){
   var b=$('#newF');if(b)b.onclick=function(){openFeedbackForm(e.id);};
   Array.prototype.forEach.call(document.querySelectorAll('[data-fc]'),function(a){a.onclick=function(){openCarryForward(a.getAttribute('data-fc'));};});
-  Array.prototype.forEach.call(document.querySelectorAll('[data-fd]'),function(a){a.onclick=function(){var id=a.getAttribute('data-fd');confirmDo('Delete feedback?',function(){return api('deleteFeedback',id);},'Deleted');};});
+  Array.prototype.forEach.call(document.querySelectorAll('[data-fd]'),function(a){a.onclick=function(){var id=a.getAttribute('data-fd');confirmDo('Delete feedback?',function(){return api('deleteFeedback',id);},'Deleted',null,function(){removeLocal('feedback',id);});};});
 }
 
 /* ------------ modal + forms ------------ */
@@ -1667,8 +1667,25 @@ function fieldHtml(f){
   return '<label>'+esc(f.label)+(f.hint?' <span class="muted">('+esc(f.hint)+')</span>':'')+'</label><input name="'+f.name+'" type="'+(f.type||'text')+'" value="'+esc(v)+'">';
 }
 function reloadAfter(p,msg,then){return p.then(function(){return api('getBootstrap');}).then(function(d){S=d;if(msg)toast(msg);if(then)then();render();});}
+// Optimistic save: apply `patch` to local data S and redraw now; the server call `p`
+// runs in the background, then S is quietly refreshed. On failure, reload server truth
+// (or the snapshot if offline) and show the error. Resolves at once so modals close.
+var PENDING=0;
+function saveOptimistic(p,msg,patch,then){
+  var snap=JSON.stringify(S);PENDING++;
+  patch(S);if(then)then();if(msg)toast(msg);render();
+  p.then(function(){return api('getBootstrap');})
+   .then(function(d){if(--PENDING===0){S=d;quietRender();}})
+   .catch(function(e){PENDING--;apiErr(e);api('getBootstrap').then(function(d){S=d;},function(){S=JSON.parse(snap);}).then(quietRender);});
+  return Promise.resolve();
+}
+// Redraw without the fade-in or a scroll jump (used for background refreshes).
+function quietRender(){var y=window.scrollY;render();var v=$('#view');if(v)v.style.animation='none';window.scrollTo(0,y);}
+function byKey(list,key,id){return (S[list]||[]).filter(function(x){return String(x[key||'id'])===String(id);})[0];}
+function upsertLocal(list,obj,key){key=key||'id';var cur=obj[key]&&byKey(list,key,obj[key]);if(cur)Object.assign(cur,obj);else{var n=Object.assign({},obj);if(!n[key])n[key]='tmp'+Date.now();(S[list]=S[list]||[]).push(n);}}
+function removeLocal(list,id,key){key=key||'id';S[list]=(S[list]||[]).filter(function(x){return String(x[key])!==String(id);});}
 function apiErr(e){var m=(e&&e.message)||String(e);toast(m==='NOT_ALLOWED'?'Not allowed for your role':m==='ACCESS_DENIED'?'Access denied':m);}
-function confirmDo(q,fn,msg,then){modal(q,[],function(){return reloadAfter(fn(),msg,then);});var m=document.querySelector('.modal h3');if(m)m.style.fontWeight='500';}
+function confirmDo(q,fn,msg,then,patch){modal(q,[],function(){return patch?saveOptimistic(fn(),msg,patch,then):reloadAfter(fn(),msg,then);});var m=document.querySelector('.modal h3');if(m)m.style.fontWeight='500';}
 
 function openEpicForm(e){
   e=e||{};
@@ -1680,7 +1697,8 @@ function openEpicForm(e){
     {name:'no_school',label:'No regular Sunday school this day',type:'checkbox',hint:'e.g. church event / holiday Sunday',value:e.no_school==='yes'},
     {name:'status',label:'Status',type:'select',options:S.meta.epicStatus,value:e.status},
     {name:'notes',label:'Notes',type:'textarea',value:e.notes},
-  ],function(o){o.id=e.id;return reloadAfter(api('saveEpic',o),'Saved');});
+  ],function(o){o.id=e.id;if(!e.id)return reloadAfter(api('saveEpic',o),'Saved'); // new events get server-side defaults
+    return saveOptimistic(api('saveEpic',o),'Saved',function(){upsertLocal('epics',o);});});
 }
 function openTaskForm(epicId,t){
   t=t||{};
@@ -1704,7 +1722,7 @@ function openTaskForm(epicId,t){
     {name:'priority',label:'Priority',type:'select',options:S.meta.taskPriority,value:t.priority||'Medium'},
     {name:'status',label:'Status',type:'select',options:S.meta.taskStatus,value:t.status||'Pending'},
     {name:'notes',label:'Notes',type:'textarea',value:t.notes},
-  ],function(o){o.id=t.id;o.epic_id=evByLabel[o.eventName]||epicId||'';if(o.owner==='(unassigned)')o.owner='';return reloadAfter(api('saveTask',o),'Saved');});
+  ],function(o){o.id=t.id;o.epic_id=evByLabel[o.eventName]||epicId||'';if(o.owner==='(unassigned)')o.owner='';var ev=byKey('epics','id',o.epic_id)||{};return saveOptimistic(api('saveTask',o),'Saved',function(){upsertLocal('tasks',Object.assign({},o,{epic_name:ev.name||'',due_date:o.due_date||(t.due_offset===o.due_offset?t.due_date:'')||ev.event_date||''}));});});
 }
 function openCloneForm(e){
   modal('Clone "'+e.name+'"',[
@@ -1719,7 +1737,7 @@ function openMemberForm(m){
     {name:'email',label:'Gmail address',value:m.email,required:true},
     {name:'role',label:'Role',type:'select',options:S.meta.roles.map(roleLabel),value:m.role?roleLabel(m.role):'Teacher'},
     {name:'class',label:'Class (only for teacher / co-teacher)',type:'select',options:['(none)'].concat(S.meta.classes||[]),value:m['class']||'(none)'},
-  ],function(o){o.role=unLabel(o.role);o.email=m.email||o.email;if(o['class']==='(none)')o['class']='';return reloadAfter(api('saveMember',o),'Saved');});
+  ],function(o){o.role=unLabel(o.role);o.email=m.email||o.email;if(o['class']==='(none)')o['class']='';return saveOptimistic(api('saveMember',o),'Saved',function(){upsertLocal('members',o,'email');});});
 }
 function unLabel(l){var map={Administrator:'admin','Co-Leader':'co_leader',Teacher:'teacher','Co-Teacher':'co_teacher',Treasurer:'treasurer','Board Rep':'board_rep',Chairman:'chairman'};return map[l]||l;}
 function openTimeOff(){
@@ -1769,11 +1787,11 @@ function openBudgetForm(b){
     {name:'amount',label:'Amount',type:'number',value:b.amount},
     {name:'status',label:'Status',type:'select',options:['Planned','Approved','Paid'],value:b.status||'Planned'},
     {name:'notes',label:'Notes',type:'textarea',value:b.notes},
-  ],function(o){var ep=S.epics.filter(function(e){return e.name===o.epicName;})[0];o.epic_id=ep?ep.id:'';o.id=b.id;return reloadAfter(api('saveBudget',o),'Saved');});
+  ],function(o){var ep=S.epics.filter(function(e){return e.name===o.epicName;})[0];o.epic_id=ep?ep.id:'';o.id=b.id;return saveOptimistic(api('saveBudget',o),'Saved',function(){upsertLocal('budget',Object.assign({},o,{amount:Number(o.amount)||0}));});});
 }
 function openFeedbackForm(epicId){
   modal('Add feedback',[{name:'text',label:'Feedback',type:'textarea',required:true}],
-    function(o){o.epic_id=epicId;return reloadAfter(api('saveFeedback',o),'Saved');});
+    function(o){o.epic_id=epicId;return saveOptimistic(api('saveFeedback',o),'Saved',function(){upsertLocal('feedback',o);});});
 }
 function openCarryForward(fbId){
   var epicOpts=S.epics.map(function(e){return e.name;});
