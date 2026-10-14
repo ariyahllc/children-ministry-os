@@ -38,3 +38,4 @@ dist-ssr
 **/.clasprc.json
 client_secret*.json
 creds.json
+_site/

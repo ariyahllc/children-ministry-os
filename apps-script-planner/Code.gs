@@ -112,6 +112,22 @@ function doGet(e) {
   return out;
 }
 
+// JSON API for the GitHub Pages copy of the app: body = {fn, args}. Exposes the
+// same public (non-underscore) functions google.script.run already does.
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    var fn = String(req.fn || '');
+    var f = globalThis[fn];
+    if (typeof f !== 'function' || /_$/.test(fn) || fn === 'doGet' || fn === 'doPost') throw new Error('Unknown function: ' + fn);
+    out = { result: f.apply(null, req.args || []) };
+  } catch (err) {
+    out = { error: (err && err.message) || String(err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 /* ------------------------------------------------------------- spreadsheet */
 
 // Cache the spreadsheet handle + table reads for the duration of ONE request.

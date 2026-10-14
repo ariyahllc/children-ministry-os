@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'apps-script-planner/**'
+      - 'ci/**'
+      - '.github/workflows/deploy.yml'
   workflow_dispatch: {}
 
 jobs:
@@ -26,3 +28,32 @@ jobs:
         run: |
           export SCRIPT_ID=$(node -e "console.log(require('./apps-script-planner/.clasp.json').scriptId)")
           node ci/deploy.mjs
+
+  # Same app on GitHub Pages; it calls the Apps Script web app above, so it ships after it.
+  pages:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Build Pages copy
+        env:
+          DEPLOYMENT_ID: ${{ secrets.CLASP_DEPLOYMENT_ID }}
+        run: node ci/build-pages.mjs
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

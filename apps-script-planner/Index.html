@@ -183,7 +183,13 @@ var TOKEN='';
 /* ------------ tiny helpers ------------ */
 /* Every server call carries the caller's token as its first argument; the
    backend resolves it (or falls back to @acfi.cc domain identity). */
-function api(fn){var a=[].slice.call(arguments,1);return new Promise(function(res,rej){google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn].apply(google.script.run,[TOKEN].concat(a));});}
+var API_URL=''; // set by ci/build-pages.mjs for the GitHub Pages copy; empty = served by Apps Script
+function api(fn){var a=[TOKEN].concat([].slice.call(arguments,1));
+  if(!API_URL)return new Promise(function(res,rej){google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn].apply(google.script.run,a);});
+  // text/plain avoids a CORS preflight, which Apps Script can't answer
+  return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:a})})
+    .then(function(r){return r.json();}).then(function(j){if(j.error)throw new Error(j.error);return j.result;});
+}
 function copyText(t){if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){toast('Link copied');},function(){window.prompt('Copy this invite link:',t);});}else{window.prompt('Copy this invite link:',t);}}
 function currentTheme(){try{return localStorage.getItem('cmp_theme')||'light';}catch(e){return 'light';}}
 function applyTheme(t){document.documentElement.classList.toggle('dark',t==='dark');try{localStorage.setItem('cmp_theme',t);}catch(e){}}
@@ -206,7 +212,10 @@ var S=null, VIEW='dashboard', EPIC=null;
 /* ------------ boot ------------ */
 function boot(){
   applyTheme(currentTheme());
-  if(typeof google==='undefined'||!google.script||!google.script.run){
+  if(API_URL){ // GitHub Pages: read the ?k=… invite token ourselves, then drop it from the address bar
+    SERVER_TOKEN=new URLSearchParams(location.search).get('k')||'';
+    if(SERVER_TOKEN)try{history.replaceState(null,'',location.pathname);}catch(e){}
+  }else if(typeof google==='undefined'||!google.script||!google.script.run){
     $('#root').innerHTML='<div class="center"><div class="card" style="max-width:470px;text-align:left">'
       +'<h2>Open this from the web-app link</h2>'
       +'<p class="muted">This page only works when Google Apps Script serves it — that\'s what provides sign-in and data. It can\'t run as a plain file.</p>'
