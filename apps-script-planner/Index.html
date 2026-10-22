@@ -853,12 +853,13 @@ function quickTiles(){
 function bindJumps(){Array.prototype.forEach.call(document.querySelectorAll('[data-jump]'),function(c){c.onclick=function(){VIEW=c.getAttribute('data-jump');EPIC=null;render();};});}
 function leaderDash(){
   var overdue=S.tasks.filter(isOverdue);
-  var unassigned=S.tasks.filter(function(t){return !String(t.owner).trim();});
+  var open=S.tasks.filter(function(t){return t.status!=='Completed';});
+  var unassigned=open.filter(function(t){return !String(t.owner||'').trim();}); // same counts as the Tasks page
   var v=$('#view');
   v.innerHTML='<div class="row"><h2>'+greeting()+'</h2><div class="flex"><button class="sm" id="notesBtn">📝 Notes → tasks</button><button class="primary" id="newEpic">+ New event</button></div></div>'
    +quickTiles()
    +'<div class="kpis">'
-   +kpi(activeEventsCurAy().length,'Events '+ayLabel(curAcademicYear()))+kpi(S.tasks.length,'Tasks')
+   +kpi(activeEventsCurAy().length,'Events '+ayLabel(curAcademicYear()))+kpi(open.length,'Open tasks')
    +kpi(overdue.length,'Overdue',overdue.length?'var(--bad)':'')+kpi(unassigned.length,'Unassigned',unassigned.length?'var(--warn)':'')
    +'</div>'
    +'<h3>Events</h3><div id="epicCards"></div>'
