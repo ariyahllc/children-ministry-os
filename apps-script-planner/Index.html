@@ -199,7 +199,7 @@
   .ev-prog{display:flex;align-items:center;gap:8px;width:150px;flex:0 0 150px}
   .ev-prog .bar{flex:1;margin:0}
   .tl-month.sub{font-size:14px;color:var(--muted);margin-top:14px}
-  .tl-badge{width:92px;flex:0 0 92px;text-align:right}
+  .tl-badge{min-width:92px;flex:0 0 auto;text-align:right}
   @media(max-width:700px){.tl-row{flex-wrap:wrap;gap:6px 12px}.tl-main{flex-basis:calc(100% - 60px)}.ev-prog{margin-left:54px;flex:1 1 auto;width:auto}.tl-badge{width:auto;flex:0 0 auto}}
   ::view-transition-old(root),::view-transition-new(root){animation-duration:.18s}
   @media(prefers-reduced-motion:reduce){*,::view-transition-group(*){animation:none!important;transition:none!important}}
@@ -398,7 +398,7 @@ function onDocNewMenu(e){var m=document.getElementById('newMenu');if(m&&!m.conta
 function openNewMenu(btn){
   if(document.getElementById('newMenu')){closeNewMenu();return;}
   var plane=svgI('<path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/>');
-  var opts=[[NAV_ICON.epics,'Event',function(){openEpicForm();}],[NAV_ICON.mytasks,'Task',function(){openTaskForm(null);}],[plane,'Time off',function(){openTimeOff();}]];
+  var opts=[[NAV_ICON.epics,'Event',function(){openEpicForm();}],['📌','Monthly activity',function(){openMonthlyActivityForm();}],[NAV_ICON.mytasks,'Task',function(){openTaskForm(null);}],[plane,'Time off',function(){openTimeOff();}]];
   var m=document.createElement('div');m.id='newMenu';m.className='menu';
   m.innerHTML=opts.map(function(o,i){return '<div class="menu-item" data-i="'+i+'"><span style="color:var(--pri);display:flex">'+o[0]+'</span> New '+esc(o[1].toLowerCase())+'</div>';}).join('');
   document.body.appendChild(m);
@@ -1070,7 +1070,32 @@ function sectionTasks(title,list){
 /* ------------ epic cards + lists ------------ */
 function activeEvents(){return S.epics.filter(function(e){return String(e.archived||'').trim()==='';});}
 function curAcademicYear(){var d=new Date();return d.getMonth()>=6?d.getFullYear():d.getFullYear()-1;}
-function activeEventsCurAy(){var ay=curAcademicYear();return activeEvents().filter(function(e){return !e.event_date||ayOf(e.event_date)===ay;});}
+function activeEventsCurAy(){var ay=curAcademicYear();return activeEvents().filter(function(e){var k=evKey(e);return !k||ayOf(k)===ay;});}
+/* Monthly activities: events pinned to a month ('YYYY-MM' in e.month) with no exact date yet. */
+function isMonthOnly(e){return !e.event_date&&!!e.month;}
+function curYM(){var t=today();return t.getFullYear()+'-'+('0'+(t.getMonth()+1)).slice(-2);}
+function monthPassed(e){return isMonthOnly(e)&&e.month<curYM();}
+function evKey(e){return e.event_date||(e.month?e.month+'-00':'');} // month-only sorts first in its month
+function monthName(ym){var m=String(ym).match(/^(\d{4})-(\d{2})/);return m?MONTHS[+m[2]-1]+' '+m[1]:'';}
+function openMonthlyActivityForm(){
+  var t=today();
+  modal('New monthly activity',[
+    {name:'name',label:'Activity',required:true},
+    {name:'month',label:'Month',type:'month',value:curYM(),required:true,hint:'no exact date yet; you pick the day later'},
+    {name:'program',label:'Program',type:'select',options:S.meta.programs,value:''},
+    {name:'notes',label:'Notes',type:'textarea'},
+  ],function(o){o.status='Planning';return reloadAfter(api('saveEpic',o),'Added to '+monthName(o.month));});
+}
+// Turn a monthly activity into a dated event: pick a day inside its month.
+function openPickDate(id){
+  var e=byKey('epics','id',id);if(!e)return;
+  var m=String(e.month).match(/^(\d{4})-(\d{2})/);var last=new Date(+m[1],+m[2],0).getDate();
+  modal('Pick a date for "'+e.name+'"',[{name:'event_date',label:'Day in '+monthName(e.month),type:'date',value:e.month+'-01',required:true}],function(o){
+    var d={id:e.id,name:e.name,program:e.program,type:e.type,event_date:o.event_date,month:'',status:e.status,notes:e.notes,no_school:e.no_school==='yes'};
+    return saveOptimistic(api('saveEpic',d),'Date set',function(){upsertLocal('epics',{id:e.id,event_date:o.event_date,month:''});});
+  });
+  var inp=document.querySelector('.modal [name="event_date"]');if(inp){inp.min=e.month+'-01';inp.max=e.month+'-'+('0'+last).slice(-2);}
+}
 function formBadge(id){var r=(S.formCounts||{})[id]||0,f=(S.feedbackFormCounts||{})[id]||0,out='';
   if(r)out+=' <span class="chip" style="background:#e7eef7;color:#1b6cb0" title="'+r+' registration form'+(r===1?'':'s')+'">📋 '+r+'</span>';
   if(f)out+=' <span class="chip" style="background:#eaf7ee;color:#1b7a3d" title="'+f+' feedback form'+(f===1?'':'s')+'">💬 '+f+'</span>';
@@ -1078,10 +1103,12 @@ function formBadge(id){var r=(S.formCounts||{})[id]||0,f=(S.feedbackFormCounts||
 function renderEpicCards(container){
   var list=activeEventsCurAy(),t=today();
   if(!list.length){container.innerHTML='<div class="empty">No events yet.</div>';return;}
-  var dated=list.filter(function(e){return e.event_date;});
-  var up=dated.filter(function(e){return parseD(e.event_date)>=t;}).sort(byDate);
-  var past=dated.filter(function(e){return parseD(e.event_date)<t;}).sort(function(a,b){return byDate(b,a);});
-  container.innerHTML=tlSections(up)+tlSections(list.filter(function(e){return !e.event_date;}))
+  // Upcoming = future dates plus every undated monthly activity (a passed month with no date needs attention, so it stays on top).
+  function isUp(e){return isMonthOnly(e)||parseD(e.event_date)>=t;}
+  var dated=list.filter(function(e){return evKey(e);});
+  var up=dated.filter(isUp).sort(byDate);
+  var past=dated.filter(function(e){return !isUp(e);}).sort(function(a,b){return byDate(b,a);});
+  container.innerHTML=tlSections(up)+tlSections(list.filter(function(e){return !evKey(e);}))
     +(past.length?'<h3 style="margin:26px 0 0;color:var(--muted)">Earlier</h3>'+tlSections(past,'sub'):'');
   bindEvRows(container);
 }
@@ -1105,9 +1132,9 @@ function renderEpics(){
     +'<input id="evSearch" placeholder="🔎 Search all events…" value="'+esc(EVENT_SEARCH)+'">'
     +'<select id="ayPick" style="width:auto">'+ayList.map(function(y){return '<option value="'+y+'"'+(y===CALYEAR?' selected':'')+'>'+ayLabel(y)+'</option>';}).join('')+'</select>'
     +'<label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showArch" style="width:auto"'+(SHOW_ARCHIVED?' checked':'')+'> show archived</label>'
-    +(lead?'<button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button>':'')
+    +(lead?'<button class="sm" id="monthAct">📌 Monthly activity</button><button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button>':'')
     +'</div></div><div id="progBody"></div>';
-  if(lead){var pb=$('#ptoBtn');if(pb)pb.onclick=openTimeOff;}
+  if(lead){var pb=$('#ptoBtn');if(pb)pb.onclick=openTimeOff;var ma=$('#monthAct');if(ma)ma.onclick=openMonthlyActivityForm;}
   if(lead)$('#tidyE').onclick=function(){confirmDo('Archive every event marked complete?',function(){return api('tidyCompleted');},'Tidied');};
   var sa=$('#showArch');if(sa)sa.onchange=function(){SHOW_ARCHIVED=this.checked;renderEpics();};
   var ap=$('#ayPick');if(ap)ap.onchange=function(){CALYEAR=+this.value;renderEpics();};
@@ -1166,7 +1193,7 @@ function renderEventsByDate(container){
     if(mo!==curMo){if(curMo)html+='</tbody></table>';curMo=mo;
       html+='<h3 style="margin:16px 0 8px">'+MON[dt.getMonth()]+' '+dt.getFullYear()+'</h3>';
       var mev=monthEv[mo]||[];
-      if(mev.length)html+='<div class="card" style="margin:0 0 8px;padding:9px 12px"><div class="small muted" style="margin-bottom:3px">📌 This month</div>'+mev.map(function(e){return '<div class="mev" data-e="'+esc(e.id)+'" style="cursor:pointer;padding:2px 0"><span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':'')+'</div>';}).join('')+'</div>';
+      if(mev.length)html+='<div class="card" style="margin:0 0 8px;padding:9px 12px"><div class="small muted" style="margin-bottom:3px">📌 To do this month (no date yet)</div>'+mev.map(function(e){return '<div class="mev" data-e="'+esc(e.id)+'" style="cursor:pointer;padding:3px 0"><span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':'')+(monthPassed(e)?' <span class="small cd-over">· month passed</span>':'')+(leadA?' <a class="small" data-pick="'+esc(e.id)+'" style="margin-left:6px">📅 Pick date</a>':'')+'</div>';}).join('')+'</div>';
       html+='<table><tbody>';}
     var evs=evByDate[k]||[];
     var isSun=dt.getDay()===0;
@@ -1196,6 +1223,7 @@ function renderEventsByDate(container){
   Array.prototype.forEach.call(container.querySelectorAll('tr[data-e]'),function(tr){tr.onclick=function(){EPIC=tr.getAttribute('data-e');render();};});
   Array.prototype.forEach.call(container.querySelectorAll('tr[data-sun]'),function(tr){tr.onclick=function(){openSundaySchoolFor(tr.getAttribute('data-sun'));};});
   Array.prototype.forEach.call(container.querySelectorAll('.mev[data-e]'),function(el){el.onclick=function(ev){ev.stopPropagation();EPIC=el.getAttribute('data-e');render();};});
+  bindPick(container);
   Array.prototype.forEach.call(container.querySelectorAll('[data-annd]'),function(a){a.onclick=function(ev){ev.stopPropagation();openSundayNote(a.getAttribute('data-annd'));};});
   Array.prototype.forEach.call(container.querySelectorAll('.card'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});
 }
@@ -1281,34 +1309,37 @@ var MONTHS=['January','February','March','April','May','June','July','August','S
 function eventsInYear(){
   return S.epics.filter(function(e){
     if(!SHOW_ARCHIVED&&String(e.archived||'').trim()!=='')return false;
-    return !e.event_date||ayOf(e.event_date)===CALYEAR; // undated buckets always show
+    var k=evKey(e);return !k||ayOf(k)===CALYEAR; // undated buckets always show
   });
 }
 function evBadge(e){
   if(String(e.archived||'').trim()!=='')return '<span class="small muted">archived</span>';
   if(eventComplete(e))return '<span class="small cd-done">✓ Complete</span>';
+  if(isMonthOnly(e))return '<span class="small '+(monthPassed(e)?'cd-over">Month passed, no date':'cd-soon">Date TBD')+'</span>'
+    +(S.meta.canManageEpics?'<br><a class="small" data-pick="'+esc(e.id)+'">📅 Pick date</a>':'');
   var cd=countdown(e.event_date);return e.event_date?'<span class="small '+cd.cls+'">'+cd.txt+'</span>':'';
 }
 function evProg(e){var p=epicProgress(e.id);return '<div class="ev-prog"><div class="bar"><i style="width:'+p.pct+'%"></i></div><span class="small muted">'+p.done+'/'+p.total+'</span></div>';}
 function tlRow(e){
   var d=parseD(e.event_date),past=d&&d<today(),arch=String(e.archived||'').trim()!=='';
-  var date=d?'<div class="tl-date"><b>'+d.getDate()+'</b><span>'+WDAYS[d.getDay()]+'</span></div>':'<div class="tl-date"><span>—</span></div>';
+  var date=d?'<div class="tl-date"><b>'+d.getDate()+'</b><span>'+WDAYS[d.getDay()]+'</span></div>':isMonthOnly(e)?'<div class="tl-date"><b style="font-size:15px">TBD</b><span>📌</span></div>':'<div class="tl-date"><span>—</span></div>';
   return '<div class="tl-row'+(past||arch?' past':'')+'" data-e="'+esc(e.id)+'">'+date
     +'<div class="tl-main"><div class="tl-name">'+esc(e.name)+formBadge(e.id)+'</div><div class="small muted">'+esc(e.program||'')+'</div></div>'
     +evProg(e)+'<div class="tl-badge">'+evBadge(e)+'</div></div>';
 }
-function monthOf(e){var d=parseD(e.event_date);return d?MONTHS[d.getMonth()]+' '+d.getFullYear():'No date yet';}
+function monthOf(e){var d=parseD(e.event_date);return d?MONTHS[d.getMonth()]+' '+d.getFullYear():isMonthOnly(e)?monthName(e.month):'No date yet';}
 // Events already in display order -> month sections (consecutive events with the same month share one).
 function tlSections(evs,cls){
   var html='',cur=null;
   evs.forEach(function(e){var m=monthOf(e);if(m!==cur){html+=(cur!==null?'</div>':'')+'<div class="tl-month'+(cls?' '+cls:'')+'">'+esc(m)+'</div><div class="tl-group">';cur=m;}html+=tlRow(e);});
   return cur!==null?html+'</div>':'';
 }
-function bindEvRows(container){Array.prototype.forEach.call(container.querySelectorAll('[data-e]'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});}
-function byDate(a,b){return String(a.event_date||'').localeCompare(String(b.event_date||''));}
+function bindEvRows(container){Array.prototype.forEach.call(container.querySelectorAll('[data-e]'),function(c){c.onclick=function(){EPIC=c.getAttribute('data-e');render();};});bindPick(container);}
+function bindPick(container){Array.prototype.forEach.call(container.querySelectorAll('[data-pick]'),function(a){a.onclick=function(ev){ev.stopPropagation();openPickDate(a.getAttribute('data-pick'));};});}
+function byDate(a,b){return evKey(a).localeCompare(evKey(b));}
 function renderEventsTimeline(container){
   var list=eventsInYear();
-  var html=tlSections(list.filter(function(e){return e.event_date;}).sort(byDate))+tlSections(list.filter(function(e){return !e.event_date;}));
+  var html=tlSections(list.filter(function(e){return evKey(e);}).sort(byDate))+tlSections(list.filter(function(e){return !evKey(e);}));
   container.innerHTML=html||'<div class="empty">No events yet.</div>';
   bindEvRows(container);
   // Bring the current month into view so upcoming events are on screen first.
@@ -1327,7 +1358,7 @@ function renderEpicDetail(){
   var lead=S.meta.canManageEpics;
   var v=$('#view');
   v.innerHTML='<div class="row"><div><a id="back">← Back</a><h2 style="margin-top:6px">'+esc(e.name)+'</h2>'
-    +'<div class="small muted">'+(e.program?esc(e.program)+' · ':'')+esc(e.event_date||'no date')+' · '+esc(e.status||'')+' · '+chip+(e.no_school==='yes'?' · <span class="pill p-Pending">No Sunday school</span>':'')+'</div></div>'
+    +'<div class="small muted">'+(e.program?esc(e.program)+' · ':'')+(isMonthOnly(e)?esc(monthName(e.month))+' (date TBD)'+(lead?' <a data-pick="'+esc(e.id)+'">📅 Pick date</a>':''):esc(e.event_date||'no date'))+' · '+esc(e.status||'')+' · '+chip+(e.no_school==='yes'?' · <span class="pill p-Pending">No Sunday school</span>':'')+'</div></div>'
     +'<div class="flex">'
     +(lead?'<button id="doneE" class="sm">'+(done?'↩ Reopen':'✓ Mark complete')+'</button><button id="editE" class="sm">Edit</button><button id="flyerE" class="sm">🎨 Flyer</button><button id="cloneE" class="sm">Clone</button><button id="archE" class="sm">'+(String(e.archived||'').trim()?'Unarchive':'Archive')+'</button><button id="delE" class="sm danger">Delete</button>':'')
     +(lead&&String(e.name||'').trim().toLowerCase()==='sunday school'?'<button id="noSch" class="sm">'+(String(e.status||'').toLowerCase()==='no school'?'Mark: class is on':'Mark: no class this week')+'</button>':'')
@@ -1341,6 +1372,7 @@ function renderEpicDetail(){
   renderEventMedia(e.id);
   renderEventForms(e.id);
   $('#back').onclick=function(){EPIC=null;render();};
+  bindPick(v);
   if(lead){
     $('#editE').onclick=function(){openEpicForm(e);};
     $('#cloneE').onclick=function(){openCloneForm(e);};

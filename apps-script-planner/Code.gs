@@ -454,6 +454,13 @@ function tz_() {
 
 // Normalize any cell value (Date object or string) to a 'yyyy-MM-dd' string,
 // avoiding UTC/local drift by preferring the literal date parts when present.
+// 'YYYY-MM' for month-only events. Sheets may have auto-converted the text to a Date.
+function fmtMonth_(v) {
+  if (!v) return '';
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : Utilities.formatDate(v, tz_(), 'yyyy-MM');
+  return String(v).trim().slice(0, 7);
+}
+
 function fmtDate_(v) {
   if (!v) return '';
   if (v instanceof Date) {
@@ -507,7 +514,7 @@ function getBootstrap(token) {
     return { access: false, email: sessionEmail_(token) || domainEmail_(), roles: ROLES };
   }
 
-  const epics = readTable_(TABS.EPICS).map(e => Object.assign({}, e, { event_date: fmtDate_(e.event_date) }));
+  const epics = readTable_(TABS.EPICS).map(e => Object.assign({}, e, { event_date: fmtDate_(e.event_date), month: fmtMonth_(e.month) }));
   const epicsById = {};
   epics.forEach(e => { epicsById[e.id] = e; });
 
