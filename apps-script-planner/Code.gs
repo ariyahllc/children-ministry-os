@@ -36,7 +36,7 @@ const TABS = {
 
 const SCHEMA = {
   Members:  ['email', 'name', 'role', 'token', 'class'],
-  Events:   ['id', 'name', 'type', 'event_date', 'status', 'notes', 'program', 'archived', 'no_school', 'month'],
+  Events:   ['id', 'name', 'type', 'event_date', 'status', 'notes', 'program', 'archived', 'no_school', 'month', 'tentative', 'draft_batch'],
   Tasks:    ['id', 'epic_id', 'title', 'owner', 'due_offset', 'due_date', 'status', 'priority', 'notes'],
   Expenses: ['id', 'epic_id', 'item', 'category', 'amount', 'status', 'notes', 'date', 'paid_by', 'reimbursed', 'receipt_url', 'budget_category'],
   Budgets: ['id', 'fy', 'category', 'amount', 'notes'],
@@ -203,6 +203,16 @@ function insert_(tab, obj) {
   const row = header.map(h => (obj[h] !== undefined && obj[h] !== null) ? obj[h] : '');
   sh.appendRow(row);
   return obj;
+}
+
+// Faster than insert_ in a loop for bulk writes.
+function insertMany_(tab, objs) {
+  if (!objs.length) return;
+  _tblCache = {};
+  const sh = sheet_(tab);
+  const header = headerOf_(sh);
+  sh.getRange(sh.getLastRow() + 1, 1, objs.length, header.length)
+    .setValues(objs.map(o => header.map(h => (o[h] !== undefined && o[h] !== null) ? o[h] : '')));
 }
 
 function updateRow_(tab, keyVal, obj) {
@@ -597,6 +607,8 @@ function saveEpic(token, data) {
     status: data.status || 'Planning',
     notes: data.notes || '',
     no_school: data.no_school ? 'yes' : '',
+    tentative: data.tentative ? 'yes' : '',
+    draft_batch: '', // once saved by a person, a draft event is no longer removed by undo
   };
   if (!clean.name) throw new Error('Event name is required');
   if (data.id) return updateRow_(TABS.EPICS, data.id, clean);
@@ -696,7 +708,8 @@ function askDorothy(token, question, history) {
     + "- Never claim you changed anything. For any create/edit, PROPOSE it: set 'answer' to a one-line confirmation question that names the task, and include an 'action' object. Wait for the user to confirm.\n"
     + "- CREATE/ADD a task: action {\"type\":\"create_task\",\"title\":\"...\",\"owner\":\"\",\"due\":\"\",\"event\":\"\"}. 'event' = best-matching event name from DATA (or ''). 'owner' = a member name if named, else ''. 'due' = ISO date or ''.\n"
     + "- EDIT/ASSIGN/RESCHEDULE/COMPLETE an existing task: action {\"type\":\"update_task\",\"id\":\"<exact id from a DATA task>\",\"taskTitle\":\"<that task's current title>\",\"changes\":{\"owner\":\"\",\"status\":\"\",\"due\":\"\",\"title\":\"\",\"priority\":\"\"}}. Include ONLY the fields being changed; use the exact 'id' from DATA. status is one of Pending / In Progress / Completed. If you can't tell which task is meant, ASK which one — do not guess. Only live tasks have an id; history items can't be edited.\n"
-    + "- These two are the ONLY changes you can make. For anything else (delete, send messages, etc.) say you can't do that yet.\n"
+    + "- If asked to draft, fill or plan next year's calendar: action {\"type\":\"draft_year\"}. If asked to copy or create tasks from previous years: action {\"type\":\"past_tasks\"}. If asked to undo the calendar draft: action {\"type\":\"undo_year_draft\"}. The app shows a preview first.\n"
+    + "- These are the ONLY changes you can make. For anything else (delete, send messages, etc.) say you can't do that yet.\n"
     + "PRIVACY: this data intentionally contains NO child personal information. Never invent or infer any child's name, birthday, contact, or allergy; if asked for a child's personal details, say that information isn't available here for privacy.\n"
     + 'Return ONLY JSON: {"answer":"...","action":<the action object or null>}. answer is the final plain text (use \\n for line breaks); include "action" ONLY when proposing a task, otherwise set it to null.\n'
     + convo + "DATA: " + JSON.stringify(ctx) + "\nQUESTION: " + question;
@@ -724,6 +737,9 @@ function dorothyAct(token, action) {
     updateRow_(TABS.TASKS, uid, patch);
     return { ok: true, message: 'Updated "' + (patch.title || t.title) + '"' + (patch.owner ? ' → ' + patch.owner : '') + (patch.status ? ' [' + patch.status + ']' : '') + (patch.due_date ? ' due ' + patch.due_date : '') + '.' };
   }
+
+  if (action.type === 'draft_year') return commitYearDraft_();
+  if (action.type === 'undo_year_draft') return undoYearDraft_();
 
   if (action.type !== 'create_task') throw new Error('Unsupported action');
   var title = String(action.title || '').trim();
@@ -1667,6 +1683,155 @@ function saveOffertory(token, date, amounts) {
   });
   if (!n) throw new Error('Enter at least one amount');
   return { ok: true, year: date.slice(0, 4) };
+}
+
+/* ---------------------------------- next-year calendar draft (Ask Dorothy, admin) */
+// Dates are worked out by code, not by the AI, so they can't be invented.
+function curAy_() { var d = new Date(); return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1; }
+function ayLabel_(ay) { return ay + '–' + String(ay + 1).slice(2); }
+function isoAy_(iso) { var m = String(iso).match(/^(\d{4})-(\d{2})/); return m ? (+m[2] >= 7 ? +m[1] : +m[1] - 1) : null; }
+function isoOf_(y, m, d) { return new Date(Date.UTC(y, m - 1, d)).toISOString().slice(0, 10); }
+function utcOf_(iso) { var p = iso.split('-'); return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])); }
+// "VBS 2025" and "VBS" are the same event year to year.
+function draftName_(name) { return String(name || '').replace(/\b20\d{2}(\s*[-–]\s*\d{2,4})?\b/g, ' ').replace(/\s+/g, ' ').replace(/^[\s\-–(]+|[\s\-–(]+$/g, ''); }
+// Easter Sunday (anonymous Gregorian algorithm) as YYYY-MM-DD.
+function easter_(y) {
+  var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  var g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  var l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  return isoOf_(y, Math.floor((h + l - 7 * m + 114) / 31), ((h + l - 7 * m + 114) % 31) + 1);
+}
+// Past dates of one event -> its date in academic year ay, or a month pin if there is no clear pattern.
+function draftRule_(dates, ay) {
+  var last = dates[dates.length - 1], mm = +last.slice(5, 7), yearOf = function (m) { return m >= 7 ? ay : ay + 1; };
+  var ym = yearOf(mm) + '-' + last.slice(5, 7);
+  var pin = { month: ym, event_date: '', rule: dates.length > 1 ? 'Pinned to month: dates varied' : 'Pinned to month: happened once' };
+  var ays = {}; dates.forEach(function (d) { ays[isoAy_(d)] = true; });
+  if (Object.keys(ays).length < 2) return pin;
+  var same = function (fn) { var v = fn(dates[0]); return dates.every(function (d) { return fn(d) === v; }) ? v : null; };
+  if (same(function (d) { return d.slice(5); }) !== null) return { month: '', event_date: yearOf(mm) + '-' + last.slice(5), rule: 'Same date every year', fixed: true };
+  var info = function (d) { var u = utcOf_(d), n = u.getUTCDate(), dim = new Date(Date.UTC(u.getUTCFullYear(), u.getUTCMonth() + 1, 0)).getUTCDate(); return { m: u.getUTCMonth() + 1, dow: u.getUTCDay(), nth: Math.ceil(n / 7), last: n + 7 > dim }; };
+  var pos = same(function (d) { var i = info(d); return i.m + '/' + i.dow + '/' + i.nth; });
+  var lastPos = same(function (d) { var i = info(d); return i.last ? i.m + '/' + i.dow : 'x' + d; });
+  var t = info(last), y = yearOf(t.m);
+  if (pos !== null && t.nth <= 4) {
+    var first = new Date(Date.UTC(y, t.m - 1, 1)).getUTCDay();
+    return { month: '', event_date: isoOf_(y, t.m, 1 + ((t.dow - first + 7) % 7) + 7 * (t.nth - 1)), rule: 'Same weekday pattern' };
+  }
+  if (lastPos !== null) {
+    var end = new Date(Date.UTC(y, t.m, 0));
+    return { month: '', event_date: isoOf_(y, t.m, end.getUTCDate() - ((end.getUTCDay() - t.dow + 7) % 7)), rule: 'Last weekday of the month' };
+  }
+  var off = same(function (d) { return Math.round((utcOf_(d) - utcOf_(easter_(+d.slice(0, 4)))) / 86400000); });
+  if (off !== null && Math.abs(off) <= 60) return { month: '', event_date: new Date(utcOf_(easter_(ay + 1)).getTime() + off * 86400000).toISOString().slice(0, 10), rule: 'Based on Easter' };
+  return pin;
+}
+// Proposals for academic year ay from the 2 full years before the current one. Pure: reads nothing but `epics`.
+function draftYear_(epics, ay) {
+  var isBucket = function (n) { return /^action items\b|^sunday school( planning)?$/i.test(String(n || '').trim()); };
+  var srcAys = [ay - 3, ay - 2], byName = {}, taken = {}, skipped = 0;
+  epics.forEach(function (e) {
+    if (isBucket(e.name)) return;
+    var key = draftName_(e.name).toLowerCase(), d = fmtDate_(e.event_date), when = d || String(e.month || '').slice(0, 7);
+    if (isoAy_(when) === ay) { taken[key] = true; taken[key + '|' + when.slice(5, 7)] = true; }
+    if (key && d && srcAys.indexOf(isoAy_(d)) >= 0) (byName[key] = byName[key] || []).push({ d: d, e: e });
+  });
+  var out = [];
+  Object.keys(byName).forEach(function (key) {
+    var rows = byName[key].sort(function (a, b) { return a.d < b.d ? -1 : 1; }), perAy = {}, groups = {};
+    rows.forEach(function (r) { var a = isoAy_(r.d); perAy[a] = (perAy[a] || 0) + 1; });
+    var repeats = Object.keys(perAy).some(function (a) { return perAy[a] > 1; }); // e.g. a monthly meeting: one per month
+    rows.forEach(function (r) { var g = repeats ? key + '|' + r.d.slice(5, 7) : key; (groups[g] = groups[g] || []).push(r); });
+    Object.keys(groups).forEach(function (g) {
+      if (taken[g]) { skipped++; return; }
+      var src = groups[g][groups[g].length - 1].e, rule = draftRule_(groups[g].map(function (r) { return r.d; }), ay);
+      out.push({ name: draftName_(src.name), program: src.program || '', type: src.type || '', notes: src.notes || '', no_school: src.no_school || '',
+        event_date: rule.event_date, month: rule.month, rule: rule.rule, tentative: rule.event_date && !rule.fixed ? 'yes' : '' });
+    });
+  });
+  out.sort(function (a, b) { return (a.event_date || a.month + '-00') < (b.event_date || b.month + '-00') ? -1 : 1; });
+  return { items: out, skipped: skipped };
+}
+function previewYearDraft(token) {
+  requireAdmin_(token);
+  var ay = curAy_() + 1, epics = readTable_(TABS.EPICS), r = draftYear_(epics, ay), filled = {};
+  r.items.forEach(function (i) { filled[(i.event_date || i.month).slice(0, 7)] = true; });
+  epics.forEach(function (e) { var w = fmtDate_(e.event_date) || String(e.month || '').slice(0, 7); if (isoAy_(w) === ay) filled[w.slice(0, 7)] = true; });
+  var empty = [];
+  for (var i = 0; i < 12; i++) { var m = (6 + i) % 12 + 1, k = (m >= 7 ? ay : ay + 1) + '-' + ('0' + m).slice(-2); if (!filled[k]) empty.push(k); }
+  return { ay: ay, label: ayLabel_(ay), sources: ayLabel_(ay - 3) + ' and ' + ayLabel_(ay - 2), items: r.items, skipped: r.skipped, emptyMonths: empty };
+}
+function commitYearDraft_() {
+  var lock = LockService.getScriptLock(); lock.waitLock(20000); // a double click must not create everything twice
+  try {
+    var ay = curAy_() + 1, items = draftYear_(readTable_(TABS.EPICS), ay).items;
+    insertMany_(TABS.EPICS, items.map(function (i) {
+      return { id: uuid_(), name: i.name, type: i.type, program: i.program, notes: i.notes, no_school: i.no_school, event_date: i.event_date, month: i.month, status: 'Planning', archived: '', tentative: i.tentative, draft_batch: String(ay) };
+    }));
+    return { ok: true, ay: ay, message: 'Added ' + items.length + ' events to ' + ayLabel_(ay) + '. Open Events, Calendar, ' + ayLabel_(ay) + ' to see them. Next: Create tasks from previous years.' };
+  } finally { lock.releaseLock(); }
+}
+// Undo removes only draft events nobody touched: saving an event clears its draft_batch, and events with tasks stay.
+function draftUndoRows_(ay) {
+  var withTasks = {}; readTable_(TABS.TASKS).forEach(function (t) { withTasks[t.epic_id] = true; });
+  var all = readTable_(TABS.EPICS).filter(function (e) { return String(e.draft_batch || '') === String(ay); });
+  return { remove: all.filter(function (e) { return !withTasks[e.id]; }), kept: all.filter(function (e) { return withTasks[e.id]; }).length };
+}
+function previewYearDraftUndo(token) {
+  requireAdmin_(token);
+  var ay = curAy_() + 1, r = draftUndoRows_(ay);
+  return { ay: ay, label: ayLabel_(ay), count: r.remove.length, kept: r.kept };
+}
+function undoYearDraft_() {
+  var ay = curAy_() + 1, r = draftUndoRows_(ay), ids = {};
+  r.remove.forEach(function (e) { ids[e.id] = true; });
+  var n = r.remove.length ? deleteWhere_(TABS.EPICS, function (e) { return ids[e.id]; }) : 0;
+  return { ok: true, ay: ay, message: 'Removed ' + n + ' draft events from ' + ayLabel_(ay) + '.' + (r.kept ? ' Kept ' + r.kept + ' that have tasks.' : '') };
+}
+// Tasks from earlier events with the same name, for accept/reject. epicId '' = every event in next academic year.
+function getPastTasks(token, epicId) {
+  requireAdmin_(token);
+  var epics = readTable_(TABS.EPICS), tasks = readTable_(TABS.TASKS), byEvent = {}, names = {}, ay = curAy_() + 1;
+  tasks.forEach(function (t) { (byEvent[t.epic_id] = byEvent[t.epic_id] || []).push(t); });
+  readTable_(TABS.MEMBERS).forEach(function (m) { names[String(m.name || '').trim().toLowerCase()] = true; });
+  var when = function (e) { return fmtDate_(e.event_date) || String(e.month || '').slice(0, 7); };
+  var targets = epics.filter(function (e) {
+    if (epicId) return String(e.id) === String(epicId);
+    return !String(e.archived || '').trim() && isoAy_(when(e)) === ay && !/^sunday school( planning)?$/i.test(String(e.name || '').trim());
+  });
+  var out = [];
+  targets.forEach(function (ev) {
+    var key = draftName_(ev.name).toLowerCase(), w = when(ev) || '9999', seen = {}, list = [];
+    (byEvent[ev.id] || []).forEach(function (t) { seen[String(t.title).trim().toLowerCase()] = true; });
+    epics.filter(function (p) { var d = fmtDate_(p.event_date); return p.id !== ev.id && d && d < w && draftName_(p.name).toLowerCase() === key; })
+      .sort(function (a, b) { return fmtDate_(a.event_date) < fmtDate_(b.event_date) ? 1 : -1; })
+      .forEach(function (p) {
+        (byEvent[p.id] || []).forEach(function (t) {
+          var title = String(t.title || '').trim(), k = title.toLowerCase();
+          if (!title || seen[k]) return;
+          seen[k] = true;
+          var owner = String(t.owner || '').trim();
+          list.push({ epic_id: ev.id, title: title, owner: names[owner.toLowerCase()] ? owner : '', priority: t.priority || 'Medium', due_offset: String(t.due_offset || '').trim(), from: ayLabel_(isoAy_(fmtDate_(p.event_date))) });
+        });
+      });
+    if (list.length) out.push({ id: ev.id, name: ev.name, when: when(ev), tasks: list });
+  });
+  return { events: out };
+}
+function addPastTasks(token, picked) {
+  requireAdmin_(token);
+  var seen = {}, ok = {};
+  readTable_(TABS.EPICS).forEach(function (e) { ok[e.id] = true; });
+  readTable_(TABS.TASKS).forEach(function (t) { seen[t.epic_id + '|' + String(t.title).trim().toLowerCase()] = true; });
+  var rows = (picked || []).filter(function (t) {
+    var title = String(t.title || '').trim(), k = t.epic_id + '|' + title.toLowerCase();
+    if (!title || !ok[t.epic_id] || seen[k]) return false;
+    seen[k] = true; return true;
+  }).map(function (t) {
+    return { id: uuid_(), epic_id: t.epic_id, title: String(t.title).trim(), owner: t.owner || '', due_offset: String(t.due_offset || '').trim(), due_date: '', status: 'Pending', priority: t.priority || 'Medium', notes: 'Copied from a previous year' };
+  });
+  insertMany_(TABS.TASKS, rows);
+  return { added: rows.length };
 }
 
 /* ---------------------------------------------- semester assignments (roster) */

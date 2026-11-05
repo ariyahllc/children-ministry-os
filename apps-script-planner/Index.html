@@ -434,18 +434,27 @@ function renderDoro(){
             detail='✏️ '+(a.taskTitle?'<b>'+esc(a.taskTitle)+'</b><br>':'')+'<span class="muted">'+chg+'</span>';
             btn='Apply change';
           }
+          else if(a.type==='draft_year'){
+            detail='<details><summary>See all '+a.items.length+' events</summary><div style="max-height:220px;overflow:auto;margin-top:6px">'+a.items.map(function(x){return '<div style="padding:3px 0"><b>'+esc(x.event_date||monthName(x.month))+'</b> '+esc(x.name)+'<br><span class="muted">'+esc(x.rule)+'</span></div>';}).join('')+'</div></details>';
+            btn='Create '+a.items.length+' events';
+          } else if(a.type==='undo_year_draft'){
+            detail='↩ Removes draft events nobody edited.';
+            btn='Remove '+a.count+' events';
+          }
           if(btn)t+='<div class="doro-action"><div class="small">'+detail+'</div><button class="doro-do" data-i="'+i+'">'+btn+'</button></div>';
         }
-        if(m._done)t+='<div class="doro-action done small">✅ Added</div>';
+        if(m._done)t+='<div class="doro-action done small">✅ Done</div>';
         return t;
       }).join('');
     } else {
       var sugg=['What tasks are overdue?','What\'s coming up next month?','Who\'s unassigned right now?','How much offertory did we collect last year?'];
       body='<div class="doro-hint">Ask about events, tasks, owners, the calendar, offertory or lessons.<div class="doro-sugg">'
-        +sugg.map(function(q){return '<button class="doro-chip" data-q="'+esc(q)+'">'+esc(q)+'</button>';}).join('')+'</div></div>';
+        +sugg.map(function(q){return '<button class="doro-chip" data-q="'+esc(q)+'">'+esc(q)+'</button>';}).join('')+'</div>'
+        +'<div style="margin-top:12px">Or ask Dorothy to do something:</div><div class="doro-sugg">'
+        +Object.keys(DORO_ACTIONS).map(function(k){return '<button class="doro-chip" data-run="'+k+'">'+esc(DORO_ACTIONS[k])+'</button>';}).join('')+'</div></div>';
     }
     if(DORO.busy)body+='<div class="doro-msg dory doro-typing">Dorothy is thinking…</div>';
-    html+='<div class="doro-panel"><div class="doro-head"><div><b>✨ Ask Dorothy</b><div class="doro-sub">Children\'s Ministry assistant</div></div><button id="doroX" class="doro-x" title="Close">✕</button></div>'
+    html+='<div class="doro-panel"><div class="doro-head"><div><b>✨ Ask Dorothy</b><div class="doro-sub">Children\'s Ministry assistant</div></div><div>'+(DORO.msgs.length?'<button id="doroNew" class="doro-x" title="Back to the list of things Dorothy can do">☰</button>':'')+'<button id="doroX" class="doro-x" title="Close">✕</button></div></div>'
       +'<div class="doro-body" id="doroBody">'+body+'</div>'
       +'<div class="doro-input"><textarea id="doroQ" rows="1" placeholder="Ask a question…"'+(DORO.busy?' disabled':'')+'></textarea><button id="doroSend" class="doro-send"'+(DORO.busy?' disabled':'')+'>➤</button></div>'
       +'<div class="doro-foot">🔒 No child personal information is shared with the assistant.</div></div>';
@@ -453,9 +462,11 @@ function renderDoro(){
   el.innerHTML=html;
   var btn=$('#doroBtn');if(btn)btn.onclick=function(){DORO.open=!DORO.open;renderDoro();};
   var x=$('#doroX');if(x)x.onclick=function(){DORO.open=false;renderDoro();};
+  var nw=$('#doroNew');if(nw)nw.onclick=function(){DORO.msgs=[];renderDoro();};
+  Array.prototype.forEach.call(el.querySelectorAll('[data-run]'),function(c){c.onclick=function(){doroRun(c.getAttribute('data-run'));};});
   var send=$('#doroSend');if(send)send.onclick=doroAsk;
   var q=$('#doroQ');if(q){q.focus();q.onkeydown=function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();doroAsk();}};}
-  Array.prototype.forEach.call(el.querySelectorAll('.doro-chip'),function(c){c.onclick=function(){var qq=$('#doroQ');if(qq)qq.value=c.getAttribute('data-q');doroAsk();};});
+  Array.prototype.forEach.call(el.querySelectorAll('[data-q]'),function(c){c.onclick=function(){var qq=$('#doroQ');if(qq)qq.value=c.getAttribute('data-q');doroAsk();};});
   Array.prototype.forEach.call(el.querySelectorAll('.doro-do'),function(b){b.onclick=function(){doroDo(+b.getAttribute('data-i'));};});
   var bd=$('#doroBody');if(bd)bd.scrollTop=bd.scrollHeight;
 }
@@ -467,13 +478,66 @@ function doroAsk(){
   if(last&&last.role==='dory'&&last.action&&!last._done&&isAffirm(text)){DORO.msgs.push({role:'user',text:text});renderDoro();doroDo(lastIdx);return;}
   var hist=DORO.msgs.slice(-6).map(function(m){return {role:m.role,text:m.text};});
   DORO.msgs.push({role:'user',text:text});DORO.busy=true;renderDoro();
-  api('askDorothy',text,hist).then(function(a){DORO.busy=false;DORO.msgs.push({role:'dory',text:String((a&&a.answer)||'(no answer)'),action:(a&&a.action)||null});renderDoro();})
+  api('askDorothy',text,hist).then(function(a){DORO.busy=false;var act=a&&a.action;if(act&&DORO_ACTIONS[act.type]){doroRun(act.type,true);return;}DORO.msgs.push({role:'dory',text:String((a&&a.answer)||'(no answer)'),action:act||null});renderDoro();})
     .catch(function(e){DORO.busy=false;DORO.msgs.push({role:'dory',text:'⚠ '+((e&&e.message)==='NOT_ALLOWED'?'Only admins can use Ask Dorothy right now.':((e&&e.message)||'Something went wrong'))});renderDoro();});
+}
+// Things Dorothy can do from her list. Each shows a preview; nothing changes until it is confirmed.
+var DORO_ACTIONS={draft_year:'📅 Draft next year\'s calendar',past_tasks:'🕘 Create tasks from previous years',undo_year_draft:'↩ Undo calendar draft'};
+function doroRun(type,typed){
+  if(DORO.busy&&!typed)return;
+  if(!typed)DORO.msgs.push({role:'user',text:DORO_ACTIONS[type]});
+  DORO.busy=true;renderDoro();
+  function say(text,action){DORO.busy=false;DORO.msgs.push({role:'dory',text:text,action:action||null});renderDoro();}
+  function fail(e){say('⚠ '+((e&&e.message)||'Something went wrong'));}
+  if(type==='draft_year')api('previewYearDraft').then(function(p){
+    var dated=p.items.filter(function(i){return i.event_date;}).length;
+    if(!p.items.length){say('Nothing to add to '+p.label+'. Every event from '+p.sources+' is already on it ('+p.skipped+').');return;}
+    say('Draft for '+p.label+' from '+p.sources+':\n- '+dated+' events with a date (most are tentative)\n- '+(p.items.length-dated)+' pinned to a month, no date yet\n- '+p.skipped+' skipped, already on the calendar'
+      +(p.emptyMonths.length?'\n- Empty months: '+p.emptyMonths.map(monthName).join(', '):'\n- Every month has at least one event'),{type:'draft_year',items:p.items});
+  }).catch(fail);
+  else if(type==='undo_year_draft')api('previewYearDraftUndo').then(function(p){
+    if(!p.count){say('No untouched draft events to remove from '+p.label+'.'+(p.kept?' Events with tasks stay: '+p.kept+'.':''));return;}
+    say('Remove '+p.count+' draft events from '+p.label+'?'+(p.kept?' Events with tasks stay: '+p.kept+'.':''),{type:'undo_year_draft',count:p.count});
+  }).catch(fail);
+  else api('getPastTasks','').then(function(p){
+    if(!p.events.length){say('No tasks found. Draft next year\'s calendar first, or the past events had no tasks.');return;}
+    var n=p.events.reduce(function(a,e){return a+e.tasks.length;},0);
+    say('Found '+n+' tasks from previous years for '+p.events.length+' events. Review them in the window.');
+    DORO.open=false;renderDoro();openPastTasksModal(p.events); // the modal sits under Dorothy's panel otherwise
+  }).catch(fail);
+}
+// Accept / reject tasks copied from earlier years. Unticked tasks are simply not added.
+function openPastTasksModal(events){
+  var bd=document.createElement('div');bd.className='backdrop';var all=[];
+  var html=events.map(function(ev){return '<div style="font-weight:600;margin:14px 0 2px">'+esc(ev.name)+' <span class="small muted" style="font-weight:400">'+esc(ev.when)+'</span></div>'
+    +ev.tasks.map(function(t){all.push(t);return '<label style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer;font-weight:400"><input type="checkbox" data-pt="'+(all.length-1)+'" checked style="width:auto;margin-top:3px"><span>'+esc(t.title)+'<br><span class="small muted">From '+esc(t.from)+(t.owner?' · '+esc(t.owner):'')+(t.due_offset?' · due '+esc(t.due_offset):'')+'</span></span></label>';}).join('');}).join('');
+  bd.innerHTML='<div class="modal" style="max-width:640px"><h3>🕘 Tasks from previous years</h3>'
+    +'<p class="small muted">Untick to reject. Added tasks start as Pending, and you can delete them later like any task.</p>'
+    +'<div class="flex" style="margin-bottom:6px"><a id="ptAll">Select all</a><a id="ptNone">Select none</a></div>'
+    +'<div style="max-height:52vh;overflow:auto">'+html+'</div>'
+    +'<div class="actions"><button id="ptCancel">Cancel</button><button class="primary" id="ptAdd">Accept selected</button></div></div>';
+  document.body.appendChild(bd);
+  function setAll(on){Array.prototype.forEach.call(bd.querySelectorAll('[data-pt]'),function(c){c.checked=on;});}
+  $('#ptAll',bd).onclick=function(){setAll(true);};
+  $('#ptNone',bd).onclick=function(){setAll(false);};
+  bd.onclick=function(ev){if(ev.target===bd)bd.remove();};
+  $('#ptCancel',bd).onclick=function(){bd.remove();};
+  $('#ptAdd',bd).onclick=function(){
+    var picked=[];Array.prototype.forEach.call(bd.querySelectorAll('[data-pt]:checked'),function(c){picked.push(all[+c.getAttribute('data-pt')]);});
+    if(!picked.length){bd.remove();return;}
+    var b=$('#ptAdd',bd);b.disabled=true;b.textContent='Adding…';
+    reloadAfter(api('addPastTasks',picked).then(function(r){picked.n=r.added;}),'',function(){toast('Added '+picked.n+' task'+(picked.n===1?'':'s'));}).then(function(){bd.remove();}).catch(function(e){b.disabled=false;b.textContent='Accept selected';apiErr(e);});
+  };
+}
+function pastTasksFor(epicId,btn){
+  btn.disabled=true;
+  api('getPastTasks',epicId).then(function(p){btn.disabled=false;if(p.events.length)openPastTasksModal(p.events);else toast('No new tasks found from previous years');}).catch(function(e){btn.disabled=false;apiErr(e);});
 }
 function doroDo(i){
   var m=DORO.msgs[i];if(!m||!m.action||m._done||DORO.busy)return;
   DORO.busy=true;renderDoro();
   api('dorothyAct',m.action).then(function(r){DORO.busy=false;m._done=true;DORO.msgs.push({role:'dory',text:'✅ '+((r&&r.message)||'Done.')});renderDoro();
+    if(r&&r.ay)CALYEAR=r.ay;
     api('getBootstrap').then(function(d){if(d&&d.access){S=d;renderView();}}).catch(function(){});})
     .catch(function(e){DORO.busy=false;DORO.msgs.push({role:'dory',text:'⚠ '+((e&&e.message)||'Could not create the task')});renderDoro();});
 }
@@ -1123,7 +1187,7 @@ var TASKS_SHOW_DONE=false;
 var TASK_SEARCH='',TASK_OWNER='__all';
 function renderEpics(){
   var v=$('#view');var lead=S.meta.canManageEpics;
-  var ays={};activeEvents().forEach(function(e){if(e.event_date){var a=ayOf(e.event_date);if(a!=null)ays[a]=true;}});
+  var ays={};activeEvents().forEach(function(e){var a=ayOf(evKey(e));if(a!=null)ays[a]=true;});
   var now=new Date();var curAy=(now.getMonth()>=6)?now.getFullYear():now.getFullYear()-1;ays[curAy]=true;
   var ayList=Object.keys(ays).map(Number).sort(function(a,b){return a-b;});
   if(CALYEAR==null||ayList.indexOf(CALYEAR)<0)CALYEAR=(ayList.indexOf(curAy)>=0?curAy:ayList[0]);
@@ -1208,7 +1272,7 @@ function renderEventsByDate(container){
       var editHtml=leadA?' <a data-annd="'+esc(k)+'" class="small" style="cursor:pointer">'+(ann.notes?'✎':'+ note')+'</a>':'';
       cells.push({html:base+noteHtml+editHtml,id:null});
     }
-    evs.forEach(function(e){cells.push({html:'<span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':''),id:e.id});});
+    evs.forEach(function(e){cells.push({html:'<span class="chip" style="margin-right:6px">'+esc(e.program||'—')+'</span>'+esc(e.name)+tentBadge(e)+(e.notes?' <span class="small muted">· '+esc(e.notes)+'</span>':''),id:e.id});});
     if(bday[k]&&bday[k].length){var bn=bday[k].map(function(bb){return esc(bb.name)+(leaderV&&bb.class?' <span class="muted">('+esc(bb.class)+')</span>':'');}).join(', ');cells.push({html:'<span style="color:var(--gold)">🎂 '+(bday[k].length>1?'Birthdays':'Birthday')+': '+bn+'</span>',id:null});}
     var away=(S.timeoff||[]).filter(function(p){return p.start&&p.member&&String(k)>=String(p.start)&&String(k)<=String(p.end||p.start);}).map(function(p){return esc(p.member)+(p.note?' <span class="muted">('+esc(p.note)+')</span>':'');});
     if(away.length)cells.push({html:'<span style="color:var(--bad)">🌴 Away: '+away.join(', ')+'</span>',id:null});
@@ -1320,12 +1384,13 @@ function evBadge(e){
     +(S.meta.canManageEpics?'<br><a class="small" data-pick="'+esc(e.id)+'">📅 Pick date</a>':'');
   var cd=countdown(e.event_date);return e.event_date?'<span class="small '+cd.cls+'">'+cd.txt+'</span>':'';
 }
+function tentBadge(e){return e.tentative==='yes'?' <span class="pill p-Pending">Tentative</span>':'';}
 function evProg(e){var p=epicProgress(e.id);return '<div class="ev-prog"><div class="bar"><i style="width:'+p.pct+'%"></i></div><span class="small muted">'+p.done+'/'+p.total+'</span></div>';}
 function tlRow(e){
   var d=parseD(e.event_date),past=d&&d<today(),arch=String(e.archived||'').trim()!=='';
   var date=d?'<div class="tl-date"><b>'+d.getDate()+'</b><span>'+WDAYS[d.getDay()]+'</span></div>':isMonthOnly(e)?'<div class="tl-date"><b style="font-size:15px">TBD</b><span>📌</span></div>':'<div class="tl-date"><span>—</span></div>';
   return '<div class="tl-row'+(past||arch?' past':'')+'" data-e="'+esc(e.id)+'">'+date
-    +'<div class="tl-main"><div class="tl-name">'+esc(e.name)+formBadge(e.id)+'</div><div class="small muted">'+esc(e.program||'')+'</div></div>'
+    +'<div class="tl-main"><div class="tl-name">'+esc(e.name)+tentBadge(e)+formBadge(e.id)+'</div><div class="small muted">'+esc(e.program||'')+'</div></div>'
     +evProg(e)+'<div class="tl-badge">'+evBadge(e)+'</div></div>';
 }
 function monthOf(e){var d=parseD(e.event_date);return d?MONTHS[d.getMonth()]+' '+d.getFullYear():isMonthOnly(e)?monthName(e.month):'No date yet';}
@@ -1358,14 +1423,14 @@ function renderEpicDetail(){
   var chip=String(e.archived||'').trim()?'<span class="cd-done">✓ archived</span>':(done?'<span class="cd-done">✓ Complete</span>':'<span class="'+cd.cls+'">'+cd.txt+'</span>');
   var lead=S.meta.canManageEpics;
   var v=$('#view');
-  v.innerHTML='<div class="row"><div><a id="back">← Back</a><h2 style="margin-top:6px">'+esc(e.name)+'</h2>'
+  v.innerHTML='<div class="row"><div><a id="back">← Back</a><h2 style="margin-top:6px">'+esc(e.name)+tentBadge(e)+'</h2>'
     +'<div class="small muted">'+(e.program?esc(e.program)+' · ':'')+(isMonthOnly(e)?esc(monthName(e.month))+' (date TBD)'+(lead?' <a data-pick="'+esc(e.id)+'">📅 Pick date</a>':''):esc(e.event_date||'no date'))+' · '+esc(e.status||'')+' · '+chip+(e.no_school==='yes'?' · <span class="pill p-Pending">No Sunday school</span>':'')+'</div></div>'
     +'<div class="flex">'
     +(lead?'<button id="doneE" class="sm">'+(done?'↩ Reopen':'✓ Mark complete')+'</button><button id="editE" class="sm">Edit</button><button id="flyerE" class="sm">🎨 Flyer</button><button id="cloneE" class="sm">Clone</button><button id="archE" class="sm">'+(String(e.archived||'').trim()?'Unarchive':'Archive')+'</button><button id="delE" class="sm danger">Delete</button>':'')
     +(lead&&String(e.name||'').trim().toLowerCase()==='sunday school'?'<button id="noSch" class="sm">'+(String(e.status||'').toLowerCase()==='no school'?'Mark: class is on':'Mark: no class this week')+'</button>':'')
     +'</div></div>'
     +'<div class="bar"><i style="width:'+p.pct+'%"></i></div><div class="small muted" style="margin:4px 0 16px">'+p.done+'/'+p.total+' done</div>'
-    +'<div class="row"><h3>Tasks</h3><div class="flex">'+(lead?'<button class="sm" id="aiT">✨ Suggest tasks</button><button class="sm primary" id="newT">+ Add task</button>':'')+'</div></div>'
+    +'<div class="row"><h3>Tasks</h3><div class="flex">'+(S.me.role==='admin'?'<button class="sm" id="pastT">🕘 From previous years</button>':'')+(lead?'<button class="sm" id="aiT">✨ Suggest tasks</button><button class="sm primary" id="newT">+ Add task</button>':'')+'</div></div>'
     +(ts.length?taskTable(ts,lead):'<div class="empty">No tasks yet.</div>')
     +renderFeedbackSection(e,lead)
     +'<div id="evMedia" style="margin-top:22px"></div>'
@@ -1374,6 +1439,7 @@ function renderEpicDetail(){
   renderEventForms(e.id);
   $('#back').onclick=function(){EPIC=null;render();};
   bindPick(v);
+  var pt=$('#pastT');if(pt)pt.onclick=function(){pastTasksFor(e.id,pt);};
   if(lead){
     $('#editE').onclick=function(){openEpicForm(e);};
     $('#cloneE').onclick=function(){openCloneForm(e);};
@@ -1764,6 +1830,7 @@ function openEpicForm(e){
     {name:'program',label:'Program',type:'select',options:S.meta.programs,value:e.program},
     {name:'event_date',label:'Event date',type:'date',value:e.event_date},
     {name:'month',label:'Or just a month',type:'month',hint:'no exact date yet — pins it to that month in the Calendar',value:e.month},
+    {name:'tentative',label:'Date is tentative',type:'checkbox',value:e.tentative==='yes'},
     {name:'no_school',label:'No regular Sunday school this day',type:'checkbox',hint:'e.g. church event / holiday Sunday',value:e.no_school==='yes'},
     {name:'status',label:'Status',type:'select',options:S.meta.epicStatus,value:e.status},
     {name:'notes',label:'Notes',type:'textarea',value:e.notes},

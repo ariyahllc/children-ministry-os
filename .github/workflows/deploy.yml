@@ -19,6 +19,9 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Check calendar draft logic
+        run: node ci/test-draft-year.mjs
+
       - name: Deploy via Apps Script API (durable, no clasp)
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
