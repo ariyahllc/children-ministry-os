@@ -1838,6 +1838,87 @@ function addPastTasks(token, picked) {
   return { added: rows.length };
 }
 
+/* ------------------------------------------- export to a new Google Sheet */
+// Text from people must stay text: a value starting with = would run as a formula in the sheet.
+function plainCell_(v) { var t = String(v == null ? '' : v); return /^[=+\-@]/.test(t) ? "'" + t : t; }
+// One row per event in academic year ay, by date; month-pinned events first in their month, undated last.
+function calendarRows_(epics, tasks, ay, includeArchived) {
+  var MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], done = {}, total = {};
+  tasks.forEach(function (t) { total[t.epic_id] = (total[t.epic_id] || 0) + 1; if (t.status === 'Completed') done[t.epic_id] = (done[t.epic_id] || 0) + 1; });
+  var rows = epics.map(function (e) {
+    var d = fmtDate_(e.event_date), m = d ? '' : fmtMonth_(e.month);
+    return { e: e, d: d, m: m, key: d || (m ? m + '-00' : '') };
+  }).filter(function (r) {
+    if (/^action items\b|^sunday school( planning)?$/i.test(String(r.e.name || '').trim())) return false;
+    if (!includeArchived && String(r.e.archived || '').trim()) return false;
+    return !r.key || isoAy_(r.key) === ay;
+  }).sort(function (a, b) { return (a.key || '9999') < (b.key || '9999') ? -1 : 1; });
+  return [['Date', 'Day', 'Event', 'Program', 'Date status', 'No Sunday school', 'Status', 'Tasks done', 'Notes']].concat(rows.map(function (r) {
+    var u = r.d ? utcOf_(r.d) : null, when = r.d ? MON[u.getUTCMonth()] + ' ' + u.getUTCDate() + ', ' + u.getUTCFullYear() : r.m ? MON[+r.m.slice(5) - 1] + ' ' + r.m.slice(0, 4) : 'No date';
+    var firm = r.d ? (String(r.e.tentative || '') === 'yes' ? 'Tentative' : 'Confirmed') : r.m ? 'Month only' : 'No date';
+    return [when, u ? DOW[u.getUTCDay()] : '', plainCell_(r.e.name), plainCell_(r.e.program), firm, String(r.e.no_school || '') === 'yes' ? 'Yes' : '', plainCell_(r.e.status), (done[r.e.id] || 0) + ' of ' + (total[r.e.id] || 0), plainCell_(r.e.notes)];
+  }));
+}
+// Budget vs spent for calendar year fy, plus that year's expenses.
+function budgetRows_(plan, expenses, epics, fy) {
+  var names = {}; epics.forEach(function (e) { names[e.id] = e.name; });
+  var spent = expenses.filter(function (x) { return x.category !== 'income' && fmtDate_(x.date).slice(0, 4) === String(fy); });
+  var byCat = {}, used = {}, totB = 0, totS = 0;
+  spent.forEach(function (x) { var c = String(x.budget_category || '').trim().toLowerCase(); byCat[c] = (byCat[c] || 0) + (Number(x.amount) || 0); });
+  var lines = plan.filter(function (b) { return String(b.fy) === String(fy); }).sort(function (a, b) { return String(a.category).localeCompare(String(b.category)); }).map(function (b) {
+    var k = String(b.category).trim().toLowerCase(), amt = Number(b.amount) || 0, sp = used[k] ? 0 : (byCat[k] || 0);
+    used[k] = true; totB += amt; totS += sp;
+    return [plainCell_(b.category), amt, sp, amt - sp, plainCell_(b.notes)];
+  });
+  var other = 0; Object.keys(byCat).forEach(function (k) { if (!used[k]) other += byCat[k]; });
+  if (other) { lines.push(['Not in the budget', 0, other, -other, 'Expenses with no matching budget category']); totS += other; }
+  lines.push(['Total', totB, totS, totB - totS, '']);
+  var items = spent.sort(function (a, b) { return fmtDate_(a.date) < fmtDate_(b.date) ? -1 : 1; }).map(function (x) {
+    return [fmtDate_(x.date), plainCell_(x.item), plainCell_(x.budget_category), plainCell_(names[x.epic_id] || ''), Number(x.amount) || 0, plainCell_(x.paid_by), plainCell_(x.reimbursed), plainCell_(x.status), plainCell_(x.notes), plainCell_(x.receipt_url)];
+  });
+  return {
+    budget: [['Category', 'Budget', 'Spent', 'Left', 'Notes']].concat(lines),
+    expenses: [['Date', 'Item', 'Budget category', 'Event', 'Amount', 'Paid by', 'Reimbursed', 'Status', 'Notes', 'Receipt']].concat(items),
+  };
+}
+// tabs = [{name, rows, money:[column indexes]}]. The app runs as its deployer, so the file is shared with whoever asked.
+function exportToNewSheet_(me, title, tabs) {
+  var ss = SpreadsheetApp.create(title);
+  tabs.forEach(function (t, i) {
+    var sh = i ? ss.insertSheet(t.name) : ss.getSheets()[0].setName(t.name), cols = t.rows[0].length;
+    var range = sh.getRange(1, 1, t.rows.length, cols);
+    range.setNumberFormat('@'); // keep dates and "2 of 5" as written
+    (t.money || []).forEach(function (c) { sh.getRange(1, c + 1, t.rows.length, 1).setNumberFormat('$#,##0.00'); });
+    range.setValues(t.rows);
+    sh.getRange(1, 1, 1, cols).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    sh.autoResizeColumns(1, cols);
+  });
+  var email = String(me.email || '').trim(), shared = false;
+  try {
+    if (email) {
+      if (email.toLowerCase() !== String(Session.getEffectiveUser().getEmail()).toLowerCase()) DriveApp.getFileById(ss.getId()).addEditor(email);
+      shared = true;
+    }
+  } catch (e) { shared = false; }
+  return { url: ss.getUrl(), shared: shared, email: email };
+}
+function exportCalendar(token, ay, includeArchived) {
+  var me = requireLeader_(token);
+  ay = Number(ay);
+  if (!ay) throw new Error('Pick a year');
+  return exportToNewSheet_(me, 'CM Calendar ' + ayLabel_(ay), [{ name: 'Calendar ' + ayLabel_(ay), rows: calendarRows_(readTable_(TABS.EPICS), readTable_(TABS.TASKS), ay, !!includeArchived) }]);
+}
+function exportBudget(token, fy) {
+  var me = requireMember_(token);
+  if (LEADERS.indexOf(me.role) < 0 && me.role !== 'treasurer') throw new Error('NOT_ALLOWED');
+  fy = String(fy || '');
+  if (!/^\d{4}$/.test(fy)) throw new Error('Pick a year');
+  var r = budgetRows_(readTable_(TABS.BUDGETPLAN), readTable_(TABS.BUDGET), readTable_(TABS.EPICS), fy);
+  return exportToNewSheet_(me, 'CM Budget ' + fy, [{ name: 'Budget ' + fy, rows: r.budget, money: [1, 2, 3] }, { name: 'Expenses ' + fy, rows: r.expenses, money: [4] }]);
+}
+
 /* ---------------------------------------------- semester assignments (roster) */
 // The assigned teacher/co-teacher team for a class this semester.
 function teamForClass_(cls) {

@@ -991,13 +991,14 @@ function renderBudgetInto(container){
       +(can?'<td class="small nowrap"><a data-ble="'+esc(l.id)+'">Edit</a> · <a data-bld="'+esc(l.id)+'" style="color:var(--bad)">✕</a></td>':'')+'</tr>';
   }).join('');
   var totLeft=totB-totS;
-  container.innerHTML='<div class="row" style="margin-top:4px"><div class="flex"><label class="small muted" style="margin:0">Financial year (Jan–Dec)</label><select id="buYear" style="width:auto">'+yearList.map(function(y){return '<option'+(y===BUFY?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select></div>'+(can?'<button class="primary" id="newBL">+ Add budget line</button>':'')+'</div>'
+  container.innerHTML='<div class="row" style="margin-top:4px"><div class="flex"><label class="small muted" style="margin:0">Financial year (Jan–Dec)</label><select id="buYear" style="width:auto">'+yearList.map(function(y){return '<option'+(y===BUFY?' selected':'')+'>'+esc(y)+'</option>';}).join('')+'</select></div>'+(can?'<div class="flex"><button class="sm" id="buExport" title="Export this year to a new Google Sheet">📤 Export</button><button class="primary" id="newBL">+ Add budget line</button></div>':'')+'</div>'
     +'<div class="kpis">'+kpi(money(totB),'Budget')+kpi(money(totS),'Spent')+kpi(money(totLeft),'Left',totLeft<0?'var(--bad)':'')+'</div>'
     +(lines.length?('<table><thead><tr><th>Category</th><th style="text-align:right">Budget</th><th style="text-align:right">Spent</th><th style="text-align:right">Left</th><th>Used</th>'+(can?'<th></th>':'')+'</tr></thead><tbody>'+rows
       +'<tr style="font-weight:600;border-top:2px solid var(--line)"><td>Total</td><td style="text-align:right">'+money(totB)+'</td><td style="text-align:right">'+money(totS)+'</td><td style="text-align:right'+(totLeft<0?';color:var(--bad)':'')+'">'+money(totLeft)+'</td><td></td>'+(can?'<td></td>':'')+'</tr>'
       +'</tbody></table>'):'<div class="empty">No budget set for '+esc(BUFY)+'.'+(can?' Add a line.':'')+'</div>')
     +(uncat>0?'<p class="small muted">'+money(uncat)+' in expenses this year isn\'t tagged to a budget category — edit an expense to assign one.</p>':'');
   var ys=$('#buYear');if(ys)ys.onchange=function(){BUFY=this.value;renderFinances();};
+  var be=$('#buExport');if(be)be.onclick=function(){exportSheet(be,function(){return api('exportBudget',BUFY);});};
   if(can){var nb=$('#newBL');if(nb)nb.onclick=function(){openBudgetLineForm(null);};
     Array.prototype.forEach.call(document.querySelectorAll('[data-ble]'),function(a){a.onclick=function(){var l=(S.budgetPlan||[]).filter(function(x){return String(x.id)===a.getAttribute('data-ble');})[0];openBudgetLineForm(l);};});
     Array.prototype.forEach.call(document.querySelectorAll('[data-bld]'),function(a){a.onclick=function(){var id=a.getAttribute('data-bld');confirmDo('Delete this budget line?',function(){return api('deleteBudgetLine',id);},'Deleted',null,function(){removeLocal('budgetPlan',id);});};});
@@ -1197,8 +1198,9 @@ function renderEpics(){
     +'<input id="evSearch" placeholder="🔎 Search all events…" value="'+esc(EVENT_SEARCH)+'">'
     +'<select id="ayPick" style="width:auto">'+ayList.map(function(y){return '<option value="'+y+'"'+(y===CALYEAR?' selected':'')+'>'+ayLabel(y)+'</option>';}).join('')+'</select>'
     +'<label class="small muted" style="margin:0;display:flex;align-items:center;gap:6px"><input type="checkbox" id="showArch" style="width:auto"'+(SHOW_ARCHIVED?' checked':'')+'> show archived</label>'
-    +(lead?'<button class="sm" id="monthAct">📌 Monthly activity</button><button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button>':'')
+    +(lead?'<button class="sm" id="calExport" title="Export this year to a new Google Sheet">📤 Export</button><button class="sm" id="monthAct">📌 Monthly activity</button><button class="sm" id="ptoBtn">🌴 Time off</button><button class="sm" id="tidyE">Tidy completed</button>':'')
     +'</div></div><div id="progBody"></div>';
+  var ce=$('#calExport');if(ce)ce.onclick=function(){exportSheet(ce,function(){return api('exportCalendar',CALYEAR,SHOW_ARCHIVED);});};
   if(lead){var pb=$('#ptoBtn');if(pb)pb.onclick=openTimeOff;var ma=$('#monthAct');if(ma)ma.onclick=openMonthlyActivityForm;}
   if(lead)$('#tidyE').onclick=function(){confirmDo('Archive every event marked complete?',function(){return api('tidyCompleted');},'Tidied');};
   var sa=$('#showArch');if(sa)sa.onchange=function(){SHOW_ARCHIVED=this.checked;renderEpics();};
@@ -1801,6 +1803,17 @@ function fieldHtml(f){
   if(f.type==='textarea')return '<label>'+esc(f.label)+'</label><textarea name="'+f.name+'" rows="3">'+esc(v)+'</textarea>';
   if(f.type==='checkbox')return '<label style="display:flex;align-items:center;gap:8px;font-weight:normal;margin-top:4px"><input name="'+f.name+'" type="checkbox" style="width:auto"'+(v?' checked':'')+'> '+esc(f.label)+(f.hint?' <span class="muted">('+esc(f.hint)+')</span>':'')+'</label>';
   return '<label>'+esc(f.label)+(f.hint?' <span class="muted">('+esc(f.hint)+')</span>':'')+'</label><input name="'+f.name+'" type="'+(f.type||'text')+'" value="'+esc(v)+'">';
+}
+// Open the tab on the click so it isn't blocked as a pop-up, then send it to the new sheet.
+function exportSheet(btn,call){
+  var w=window.open('','_blank'),label=btn.textContent;btn.disabled=true;btn.textContent='Exporting…';
+  function done(){btn.disabled=false;btn.textContent=label;}
+  call().then(function(r){
+    done();
+    if(!r.shared){try{w&&w.close();}catch(e){}toast('Sheet created, but it could not be shared with '+(r.email||'you')+'. Ask an admin to check the app account\'s Drive.');return;}
+    if(w)w.location.href=r.url;else toast('Sheet created. Allow pop-ups to open it.');
+    toast('Sheet created');
+  }).catch(function(e){done();try{w&&w.close();}catch(_){}apiErr(e);});
 }
 function reloadAfter(p,msg,then){return p.then(function(){return api('getBootstrap');}).then(function(d){S=d;if(msg)toast(msg);if(then)then();render();});}
 // Optimistic save: apply `patch` to local data S and redraw now; the server call `p`

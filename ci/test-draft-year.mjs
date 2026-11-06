@@ -37,3 +37,24 @@ assert.equal(get('New This Year').month, '2027-09');
 assert.equal(skipped, 1);
 assert.equal(ctx.draftYear_([...epics, ...items.map((i) => ({ ...i, id: i.name + 'x' }))], 2027).items.length, 0); // running twice adds nothing
 console.log('draft year checks pass');
+
+// Export rows
+const calRows = ctx.calendarRows_([
+  ev('Mothers Day', '2028-05-14', { tentative: 'yes' }), ev('Coat Drive', '', { month: '2027-11' }), ev('Old', '2025-01-05'),
+  ev('=SUM(A1)', '2027-09-05'), ev('Gone', '2027-09-12', { archived: 'yes' }), ev('Sunday School', '2027-09-05'),
+], [{ epic_id: 'Mothers Day2028-05-14', status: 'Completed' }, { epic_id: 'Mothers Day2028-05-14', status: 'Pending' }], 2027, false);
+assert.deepEqual(Array.from(calRows.slice(1), (r) => r[2]), ["'=SUM(A1)", 'Coat Drive', 'Mothers Day']); // order, no formulas, no archived/old/buckets
+assert.equal(calRows[3][0], 'May 14, 2028');
+assert.equal(calRows[3][4], 'Tentative');
+assert.equal(calRows[3][7], '1 of 2');
+assert.equal(calRows[2][0], 'November 2027');
+const bud = ctx.budgetRows_(
+  [{ fy: '2027', category: 'Food', amount: 100, notes: '' }, { fy: '2026', category: 'Old', amount: 9 }],
+  [{ date: '2027-03-01', category: 'expense', budget_category: 'food', amount: 30, item: 'Pizza' }, { date: '2027-04-01', category: 'expense', budget_category: '', amount: 5, item: 'Tape' },
+   { date: '2027-04-02', category: 'income', amount: 50 }, { date: '2026-04-01', category: 'expense', budget_category: 'food', amount: 7 }], [], '2027');
+assert.equal(bud.budget.length, 4); // header, Food, not in budget, total
+assert.equal(bud.budget[1][2], 30);
+assert.equal(bud.budget[1][3], 70);
+assert.equal(bud.budget[3][2], 35);
+assert.equal(bud.expenses.length, 3); // header + 2; income and other years left out
+console.log('export checks pass');
