@@ -1703,6 +1703,10 @@ function easter_(y) {
 }
 // Past dates of one event -> its date in academic year ay, or a month pin if there is no clear pattern.
 function draftRule_(dates, ay) {
+  // Newest practice wins: look for a pattern only in the 2 latest years the event happened.
+  var recent = {}; dates.forEach(function (d) { recent[isoAy_(d)] = true; });
+  var keep = Object.keys(recent).map(Number).sort().slice(-2);
+  dates = dates.filter(function (d) { return keep.indexOf(isoAy_(d)) >= 0; });
   var last = dates[dates.length - 1], mm = +last.slice(5, 7), yearOf = function (m) { return m >= 7 ? ay : ay + 1; };
   var ym = yearOf(mm) + '-' + last.slice(5, 7);
   var pin = { month: ym, event_date: '', rule: dates.length > 1 ? 'Pinned to month: dates varied' : 'Pinned to month: happened once' };
@@ -1726,10 +1730,10 @@ function draftRule_(dates, ay) {
   if (off !== null && Math.abs(off) <= 60) return { month: '', event_date: new Date(utcOf_(easter_(ay + 1)).getTime() + off * 86400000).toISOString().slice(0, 10), rule: 'Based on Easter' };
   return pin;
 }
-// Proposals for academic year ay from the 2 full years before the current one. Pure: reads nothing but `epics`.
+// Proposals for academic year ay from the 3 years before it (the last one is usually in progress). Pure: reads nothing but `epics`.
 function draftYear_(epics, ay) {
   var isBucket = function (n) { return /^action items\b|^sunday school( planning)?$/i.test(String(n || '').trim()); };
-  var srcAys = [ay - 3, ay - 2], byName = {}, taken = {}, skipped = 0;
+  var srcAys = [ay - 3, ay - 2, ay - 1], byName = {}, taken = {}, skipped = 0;
   epics.forEach(function (e) {
     if (isBucket(e.name)) return;
     var key = draftName_(e.name).toLowerCase(), d = fmtDate_(e.event_date), when = d || String(e.month || '').slice(0, 7);
@@ -1759,7 +1763,7 @@ function previewYearDraft(token) {
   epics.forEach(function (e) { var w = fmtDate_(e.event_date) || String(e.month || '').slice(0, 7); if (isoAy_(w) === ay) filled[w.slice(0, 7)] = true; });
   var empty = [];
   for (var i = 0; i < 12; i++) { var m = (6 + i) % 12 + 1, k = (m >= 7 ? ay : ay + 1) + '-' + ('0' + m).slice(-2); if (!filled[k]) empty.push(k); }
-  return { ay: ay, label: ayLabel_(ay), sources: ayLabel_(ay - 3) + ' and ' + ayLabel_(ay - 2), items: r.items, skipped: r.skipped, emptyMonths: empty };
+  return { ay: ay, label: ayLabel_(ay), sources: ayLabel_(ay - 3) + ', ' + ayLabel_(ay - 2) + ' and ' + ayLabel_(ay - 1), items: r.items, skipped: r.skipped, emptyMonths: empty };
 }
 function commitYearDraft_() {
   var lock = LockService.getScriptLock(); lock.waitLock(20000); // a double click must not create everything twice

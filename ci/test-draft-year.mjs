@@ -17,6 +17,8 @@ const epics = [
   ev('Sunday School', '2025-09-07'), ev('Action Items 2025-26', ''),           // buckets: never copied
   ev('Harvest', '2024-10-06'), ev('Harvest', '2025-10-05'),                    // already on next year's calendar
   ev('Harvest', '2027-10-03'),
+  ev('Fall Bash', '2024-10-13'), ev('Fall Bash', '2025-10-26'), ev('Fall Bash', '2026-10-25'), // moved: newest 2 years decide (4th Sunday)
+  ev('New This Year', '2026-09-13'),                                           // only in the current year: still carried over
 ];
 const { items, skipped } = ctx.draftYear_(epics, 2027);
 const get = (n) => items.find((i) => i.name === n);
@@ -30,6 +32,8 @@ assert.equal(get('VBS').month, '2028-06');
 assert.equal(get('Coat Drive').month, '2027-11');
 assert.equal(items.filter((i) => i.name === 'Team Meeting').length, 2);
 assert.ok(!get('Sunday School') && !get('Harvest') && !items.some((i) => /action/i.test(i.name)));
+assert.equal(get('Fall Bash').event_date, '2027-10-24');
+assert.equal(get('New This Year').month, '2027-09');
 assert.equal(skipped, 1);
 assert.equal(ctx.draftYear_([...epics, ...items.map((i) => ({ ...i, id: i.name + 'x' }))], 2027).items.length, 0); // running twice adds nothing
 console.log('draft year checks pass');
