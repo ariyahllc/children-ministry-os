@@ -1825,7 +1825,7 @@ function saveOptimistic(p,msg,patch,then){
   patch(S);if(then)then();if(msg)toast(msg);render();
   p.then(function(){return api('getBootstrap');})
    .then(function(d){if(--PENDING===0){S=d;quietRender();}})
-   .catch(function(e){PENDING--;apiErr(e);api('getBootstrap').then(function(d){S=d;},function(){S=JSON.parse(snap);}).then(quietRender);});
+   .catch(function(e){PENDING--;apiErr(e);if(!S.access)return;api('getBootstrap').then(function(d){S=d;},function(){S=JSON.parse(snap);}).then(quietRender);});
   return Promise.resolve();
 }
 // Redraw without the fade-in or a scroll jump (used for background refreshes).
@@ -1833,7 +1833,10 @@ function quietRender(){var y=window.scrollY;render();var v=$('#view');if(v)v.sty
 function byKey(list,key,id){return (S[list]||[]).filter(function(x){return String(x[key||'id'])===String(id);})[0];}
 function upsertLocal(list,obj,key){key=key||'id';var cur=obj[key]&&byKey(list,key,obj[key]);if(cur)Object.assign(cur,obj);else{var n=Object.assign({},obj);if(!n[key])n[key]='tmp'+Date.now();(S[list]=S[list]||[]).push(n);}}
 function removeLocal(list,id,key){key=key||'id';S[list]=(S[list]||[]).filter(function(x){return String(x[key])!==String(id);});}
-function apiErr(e){var m=(e&&e.message)||String(e);toast(m==='NOT_ALLOWED'?'Not allowed for your role':m==='ACCESS_DENIED'?'Access denied':m);}
+// ACCESS_DENIED means the sign-in is gone (sessions last 6 hours): send them back to sign in.
+function apiErr(e){var m=(e&&e.message)||String(e);
+  if(m==='ACCESS_DENIED'){Array.prototype.forEach.call(document.querySelectorAll('.backdrop'),function(b){b.remove();});finishSignOut();toast('Your sign-in expired. Please sign in again.');return;}
+  toast(m==='NOT_ALLOWED'?'Not allowed for your role':m);}
 function confirmDo(q,fn,msg,then,patch){modal(q,[],function(){return patch?saveOptimistic(fn(),msg,patch,then):reloadAfter(fn(),msg,then);});var m=document.querySelector('.modal h3');if(m)m.style.fontWeight='500';}
 
 function openEpicForm(e){
