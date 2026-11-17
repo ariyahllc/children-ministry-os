@@ -1793,6 +1793,70 @@ function undoYearDraft_() {
   return { ok: true, ay: ay, message: 'Removed ' + n + ' draft events from ' + ayLabel_(ay) + '.' + (r.kept ? ' Kept ' + r.kept + ' that have tasks.' : '') };
 }
 // Tasks from earlier events with the same name, for accept/reject. epicId '' = every event in next academic year.
+// Import one academic year from an old-style "Calendar of Events" tab (same layout
+// as past years: Day | Date | Event | Notes | Lead | Link, with "Month YYYY" header rows).
+// rows = the tab's cell text, read in the admin's browser. Only rows inside academic
+// year ay (Jul ay .. Jun ay+1) are used. Plain "Regular Sunday school class" rows are
+// skipped (the calendar shows Sundays already). Undated rows are pinned to their month.
+// A Dorothy draft event with the same name in the same month is replaced by the sheet row.
+var MONTH_NAMES_ = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+function sheetCalRows_(rows, ay, epics) {
+  var lo = ay + '-07-01', hi = (ay + 1) + '-06-30', curMonth = '', items = [], skipped = 0, seen = {};
+  var key = function (n) { return draftName_(n).toLowerCase(); };
+  var have = {}, drafts = {}, prog = {};
+  epics.forEach(function (e) {
+    var k = key(e.name), d = fmtDate_(e.event_date), m = d ? d.slice(0, 7) : String(e.month || '').slice(0, 7);
+    have[k + '|' + (d || m)] = true;
+    if (e.draft_batch && m) drafts[k + '|' + m] = e;
+    if (e.program && (!prog[k] || d > prog[k].d)) prog[k] = { d: d, p: e.program };
+  });
+  rows.forEach(function (r) {
+    var c = function (i) { return String(r[i] == null ? '' : r[i]).trim(); };
+    var mh = c(0).match(/^([A-Za-z]+)\s+(\d{4})$/);
+    if (mh && MONTH_NAMES_.indexOf(mh[1].toLowerCase()) >= 0) { curMonth = mh[2] + '-' + ('0' + (MONTH_NAMES_.indexOf(mh[1].toLowerCase()) + 1)).slice(-2); return; }
+    var name = c(2);
+    if (!name) return;
+    if (/^regular sunday school class\s*(\([^)]*\))?\.?$/i.test(name)) { skipped++; return; }
+    name = name.replace(/^regular sunday school class\s*\+\s*/i, '');
+    var dm = c(1).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    var date = dm ? dm[3] + '-' + ('0' + dm[1]).slice(-2) + '-' + ('0' + dm[2]).slice(-2) : '';
+    var month = date ? '' : curMonth;
+    var when = date || month;
+    if (!when || (date ? (date < lo || date > hi) : (month + '-01' < lo || month + '-01' > hi))) return;
+    var k = key(name);
+    if (have[k + '|' + when] || seen[k + '|' + when]) { if (!seen[k + '|' + when]) skipped++; seen[k + '|' + when] = true; return; }
+    seen[k + '|' + when] = true;
+    var notes = [c(3), c(4) ? 'Lead: ' + c(4) : '', c(5) ? 'Link: ' + c(5) : ''].filter(String).join(' · ').slice(0, 500);
+    var d = drafts[k + '|' + when.slice(0, 7)];
+    items.push({
+      name: name, event_date: date, month: month, notes: notes,
+      program: (prog[k] && prog[k].p) || "Children's Ministry",
+      no_school: /no (sunday school|child ?care)/i.test(name + ' ' + notes) ? 'yes' : '',
+      replaces: d ? d.id : '',
+    });
+  });
+  return { items: items, skipped: skipped };
+}
+function importCalendarRows(token, rows, ay, commit) {
+  requireAdmin_(token);
+  ay = parseInt(ay, 10);
+  if (!(ay > 2000) || !Array.isArray(rows)) throw new Error('Bad import');
+  var epics = readTable_(TABS.EPICS);
+  var res = sheetCalRows_(rows, ay, epics);
+  if (!commit) return res;
+  var lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    var fresh = [];
+    res.items.forEach(function (i) {
+      var row = { name: i.name, event_date: i.event_date, month: i.month, notes: i.notes, program: i.program, no_school: i.no_school, tentative: i.month ? 'yes' : '', draft_batch: '' };
+      if (i.replaces) updateRow_(TABS.EPICS, i.replaces, row);
+      else fresh.push(Object.assign({ id: uuid_(), type: 'Other', status: 'Planning', archived: '' }, row));
+    });
+    insertMany_(TABS.EPICS, fresh);
+    return { added: fresh.length, replaced: res.items.length - fresh.length, skipped: res.skipped };
+  } finally { lock.releaseLock(); }
+}
+
 function getPastTasks(token, epicId) {
   requireAdmin_(token);
   var epics = readTable_(TABS.EPICS), tasks = readTable_(TABS.TASKS), byEvent = {}, names = {}, ay = curAy_() + 1;

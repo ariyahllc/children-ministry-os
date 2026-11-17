@@ -58,3 +58,22 @@ assert.equal(bud.budget[1][3], 70);
 assert.equal(bud.budget[3][2], 35);
 assert.equal(bud.expenses.length, 3); // header + 2; income and other years left out
 console.log('export checks pass');
+
+// Sheet import (sheetCalRows_): month headers, skipped plain Sundays, "+" prefix, month pins, drafts replaced, year window.
+const sh = ctx.sheetCalRows_([
+  ['June 2027', '', 'June Events'], ['Sunday', '6/27/2027', 'Youth Camp'],              // before the year: left out
+  ['July 2027', '', 'Mission Trip'], ['Sunday', '7/4/2027', 'Regular Sunday school class', 'note'],
+  ['Sunday', '7/11/2027', 'Regular Sunday school class + Parent-Teachers meetings'],
+  ['Monday - Saturday', '', 'Mission Trip', 'To be confirmed'], ['Monday - Saturday', '', 'Mission Trip'],
+  ['December 2027', '', 'December'], ['Saturday', '12/25/2027', 'Christmas Day', 'No Sunday School'],
+  ['Sunday', '12/12/2027', 'Harvest'],                                                   // already in the app
+], 2027, [ev('Christmas Day', '2026-12-25', { program: 'Church Events' }), { id: 'dr1', name: 'Christmas Day', event_date: '2027-12-24', month: '', draft_batch: 'b1' }, ev('Harvest', '2027-12-12')]);
+const si = (n) => sh.items.find((i) => i.name === n);
+assert.equal(sh.items.length, 3);
+assert.equal(si('Parent-Teachers meetings').event_date, '2027-07-11');
+assert.equal(si('Mission Trip').month, '2027-07');
+assert.equal(si('Christmas Day').program, 'Church Events');
+assert.equal(si('Christmas Day').no_school, 'yes');
+assert.equal(si('Christmas Day').replaces, 'dr1');
+assert.equal(sh.skipped, 2); // plain Sunday + Harvest already there
+console.log('sheet import checks pass');
